@@ -19,9 +19,9 @@ const STEPS = [
 ];
 
 function AnalyzingPageContent() {
-  const router = useRouter();
-  const params = useSearchParams();
- const personaId = params?.get("persona_id") ?? "";
+const router = useRouter();
+const params = useSearchParams();
+const exportId = params?.get("export_id") ?? "";
 
   const [state, setState] = useState<AnalysisState>("analyzing");
   const [currentStep, setCurrentStep] = useState(0);
