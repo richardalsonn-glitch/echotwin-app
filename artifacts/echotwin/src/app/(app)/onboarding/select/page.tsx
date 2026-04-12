@@ -96,11 +96,11 @@ try {
   participants = JSON.parse(raw);
 } catch {}
 
-  let stats: Record<string, ParticipantStat> = {};
-  try {
-    const raw = params.get("stats") ?? "{}";
-    stats = JSON.parse(raw);
-  } catch {}
+let stats: Record<string, ParticipantStat> = {};
+try {
+  const raw = params?.get("stats") ?? "{}";
+  stats = JSON.parse(raw);
+} catch {}
 
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [requesterName, setRequesterName] = useState("");
