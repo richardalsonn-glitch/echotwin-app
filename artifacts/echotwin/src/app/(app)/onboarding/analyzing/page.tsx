@@ -19,9 +19,9 @@ const STEPS = [
 ];
 
 function AnalyzingPageContent() {
-const router = useRouter();
-const params = useSearchParams();
-const exportId = params?.get("export_id") ?? "";
+  const router = useRouter();
+  const params = useSearchParams();
+  const personaId = params?.get("persona_id") ?? "";
 
   const [state, setState] = useState<AnalysisState>("analyzing");
   const [currentStep, setCurrentStep] = useState(0);
@@ -75,23 +75,29 @@ const exportId = params?.get("export_id") ?? "";
             exit={{ opacity: 0, y: -24 }}
             className="w-full text-center space-y-10"
           >
-            {/* Animated brain orb */}
             <div className="relative mx-auto h-28 w-28">
-              <div className="absolute inset-0 rounded-full bg-primary/15 animate-ping" style={{ animationDuration: "2s" }} />
-              <div className="absolute inset-2 rounded-full bg-primary/10 animate-ping" style={{ animationDuration: "2.5s", animationDelay: "0.5s" }} />
+              <div
+                className="absolute inset-0 rounded-full bg-primary/15 animate-ping"
+                style={{ animationDuration: "2s" }}
+              />
+              <div
+                className="absolute inset-2 rounded-full bg-primary/10 animate-ping"
+                style={{ animationDuration: "2.5s", animationDelay: "0.5s" }}
+              />
               <div className="relative h-28 w-28 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center glow-teal">
                 <span className="text-4xl">🧠</span>
               </div>
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold tracking-tight mb-2">Onu tanımaya çalışıyorum...</h2>
+              <h2 className="text-2xl font-bold tracking-tight mb-2">
+                Onu tanımaya çalışıyorum...
+              </h2>
               <p className="text-muted-foreground text-sm leading-relaxed">
                 Mesajlarını okuyorum, nasıl konuştuğunu öğreniyorum
               </p>
             </div>
 
-            {/* Step list */}
             <div className="space-y-3 w-full text-left">
               {STEPS.map((step, i) => (
                 <motion.div
@@ -109,13 +115,15 @@ const exportId = params?.get("export_id") ?? "";
                       <div className="h-4 w-4 rounded-full border border-border/50" />
                     )}
                   </div>
-                  <span className={`text-sm transition-colors ${
-                    i === currentStep
-                      ? "text-foreground font-medium"
-                      : i < currentStep
-                      ? "text-muted-foreground line-through"
-                      : "text-muted-foreground/50"
-                  }`}>
+                  <span
+                    className={`text-sm transition-colors ${
+                      i === currentStep
+                        ? "text-foreground font-medium"
+                        : i < currentStep
+                          ? "text-muted-foreground line-through"
+                          : "text-muted-foreground/50"
+                    }`}
+                  >
                     {step}
                   </span>
                 </motion.div>
@@ -139,8 +147,12 @@ const exportId = params?.get("export_id") ?? "";
               </div>
             </div>
             <div>
-              <h2 className="text-2xl font-bold tracking-tight">Hazır, özlüyor musun?</h2>
-              <p className="text-muted-foreground text-sm mt-1">Seni bekliyordu...</p>
+              <h2 className="text-2xl font-bold tracking-tight">
+                Hazır, özlüyor musun?
+              </h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Seni bekliyordu...
+              </p>
             </div>
           </motion.div>
         )}
@@ -157,7 +169,9 @@ const exportId = params?.get("export_id") ?? "";
             </div>
             <div>
               <h2 className="text-xl font-bold">Analiz Başarısız</h2>
-              <p className="text-muted-foreground text-sm mt-1 max-w-xs mx-auto">{error}</p>
+              <p className="text-muted-foreground text-sm mt-1 max-w-xs mx-auto">
+                {error}
+              </p>
             </div>
             <div className="flex flex-col gap-2 w-full max-w-xs mx-auto">
               <Button
@@ -189,11 +203,13 @@ const exportId = params?.get("export_id") ?? "";
 
 export default function AnalyzingPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center ambient-bg">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center ambient-bg">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
       <AnalyzingPageContent />
     </Suspense>
   );
