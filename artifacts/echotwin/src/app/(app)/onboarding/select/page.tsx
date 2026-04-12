@@ -90,11 +90,11 @@ const params = useSearchParams();
 const exportId = params?.get("export_id") ?? "";
 const fileInputRef = useRef<HTMLInputElement>(null);
 
-  let participants: string[] = [];
-  try {
-    const raw = params.get("participants") ?? "[]";
-    participants = JSON.parse(raw);
-  } catch {}
+ let participants: string[] = [];
+try {
+  const raw = params?.get("participants") ?? "[]";
+  participants = JSON.parse(raw);
+} catch {}
 
   let stats: Record<string, ParticipantStat> = {};
   try {
