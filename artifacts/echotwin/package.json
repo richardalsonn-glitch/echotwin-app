@@ -14,7 +14,8 @@
     "next": "^15.3.4",
     "openai": "^4.104.0",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "recharts": "^2.12.7"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
