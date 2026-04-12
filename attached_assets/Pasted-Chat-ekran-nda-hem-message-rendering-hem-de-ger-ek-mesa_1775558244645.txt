@@ -1,0 +1,80 @@
+Chat ekranında hem message rendering hem de gerçek mesajlaşma hissi veren presence / status sistemi için kapsamlı bir iyileştirme istiyorum.
+
+1. Mesaj balonları
+- Her mesaj ayrı bir chat bubble olarak render edilsin
+- WhatsApp / iMessage gibi görünmeli
+- Aynı kullanıcı arka arkaya yazsa bile her mesaj ayrı balon olmalı
+
+Kurallar:
+- Her message objesi = 1 bubble
+- Mesajlar merge edilmemeli
+- content append edilmemeli
+- streaming sırasında tek aktif assistant mesajı güncellenebilir ama yeni mesajlar ayrı başlamalı
+- timestamp her mesaj için ayrı olsun
+- "Sen" etiketi veya avatar doğru hizalansın
+
+Spacing:
+- aynı kullanıcı ardışık mesajları arasında küçük boşluk (8px)
+- farklı kullanıcı geçişlerinde daha büyük boşluk (16-20px)
+- sağ/sol hizalama net olsun
+
+En önemli kural:
+Mesajlar asla tek balonda birleşmesin.
+
+2. Message status (tek tik / çift tik / mavi tik)
+Kullanıcının gönderdiği mesajlarda status ikonu olsun.
+
+State yapısı:
+- sent
+- delivered
+- read
+
+UI karşılığı:
+- sent = tek tik gri
+- delivered = çift tik gri
+- read = çift tik mavi
+
+Eğer gerçek read receipt yoksa şimdilik simüle edebilirsin:
+- assistant cevap üretmeye başladığında delivered
+- assistant cevap tamamlandığında read
+
+3. Header status / presence sistemi
+Sohbet ekranı üst barda kişinin adının altında dinamik durum yazsın.
+
+Durumlar:
+- sohbet henüz başlamadıysa: "son görülme bugün 14:32" gibi
+- ben ilk mesajı gönderdiğim anda: "çevrimiçi"
+- assistant cevap üretmeye başladığında: "yazıyor..."
+- cevap geldikten sonra: kısa süre "çevrimiçi", sonra tekrar "son görülme ..."
+
+Yani:
+- typing indicator sadece mesaj alanında değil
+- header altındaki status text alanında da görünmeli
+
+4. Presence state machine
+Persona / chat status için tutarlı state yapısı kur:
+- idle → son görülme
+- online → çevrimiçi
+- typing → yazıyor...
+- recent_online → az önce aktifti / son görülme
+
+5. Boş mesaj bug’ını önle
+- content boşsa assistant message render edilmesin
+- typing indicator ayrı state olarak kalsın
+- stream başarısız olursa boş / yarım assistant mesajı temizlensin
+- database'e boş assistant message kaydedilmesin
+
+6. UI polish
+Chat ekranını WhatsApp benzeri ama daha premium hissettirecek şekilde polish et:
+- header daha şık olsun
+- avatar, isim ve status hizalaması düzgün olsun
+- timestamp ve tick ikonları iyi yerleşsin
+- bubble layout daha profesyonel görünsün
+- spacing ve radius değerleri daha iyi ayarlansın
+- genel görünüm daha premium ve mobil uygulama gibi olsun
+
+Öncelik:
+- gerçek mesajlaşma hissi
+- premium görünüm
+- tutarlı state yönetimi
+- mevcut chat akışını bozmadan uygulama

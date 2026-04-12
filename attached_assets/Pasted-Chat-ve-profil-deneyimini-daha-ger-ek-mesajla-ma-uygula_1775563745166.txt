@@ -1,0 +1,57 @@
+Chat ve profil deneyimini daha gerçek mesajlaşma uygulaması hissi verecek şekilde geliştirmeni istiyorum.
+
+1. Profil fotoğrafı ekleme
+- Kullanıcı oluşturduğu persona/profile için profil fotoğrafı ekleyebilsin
+- Fotoğraf yükleme akışı olsun
+- Profil fotoğrafı header'da görünsün
+- Kayıtlı kişiler ekranında da görünsün
+- Fotoğraf yoksa şık bir varsayılan avatar fallback olsun
+- Profil düzenleme ekranında fotoğraf değiştirme / kaldırma seçenekleri olsun
+
+2. Sohbette değilken bildirim mantığı
+- Kullanıcı o sohbet ekranında değilse ve assistant yeni mesaj atarsa bildirim hissi oluşsun
+- Tarayıcı izin verdiyse browser notification desteği ekle
+- Ayrıca uygulama içinde de unread / yeni mesaj göstergesi olsun
+
+3. Bildirim sesi
+- Kullanıcı sohbet ekranında değilken yeni mesaj gelirse kısa bir bildirim sesi çalsın
+- Bu ses rahatsız etmeyen, premium ve temiz bir ses olsun
+- Kullanıcı isterse ayarlardan bildirim sesini kapatabilsin
+
+4. Uygulama içi mesaj bildirimi
+- Home / konuşmalar listesinde yeni mesaj geldiyse:
+  - unread badge görünsün
+  - son mesaj önizlemesi güncellensin
+  - sohbet listesi en üste taşınsın
+- Bu davranış gerçek mesajlaşma uygulamaları gibi çalışsın
+
+5. Sohbet içi yeni mesaj hissi
+- Eğer kullanıcı o sohbet ekranındaysa:
+  - yeni assistant mesajı doğal şekilde gelsin
+  - üst status "yazıyor..." → "çevrimiçi" → "son görülme" akışı korunsun
+  - istenirse hafif mesaj gelme animasyonu olsun
+- Sohbet içindeyken harici bildirim sesi zorunlu değil, ama çok hafif bir incoming hissi olabilir
+
+6. WhatsApp benzeri güncel deneyim
+- Son güncel WhatsApp hissine yakın davranışlar olsun ama birebir kopya olmasın
+- Özellikle:
+  - üst header daha modern
+  - avatar daha şık
+  - unread badge temiz
+  - son mesaj önizlemesi düzgün
+  - yeni mesaj gelince konuşma listesinde canlı güncelleme
+  - timestamp ve tick sistemi profesyonel görünsün
+
+7. Teknik istekler
+- Mevcut chat akışını bozma
+- Bildirim sistemi state ile senkron çalışsın
+- Sadece aktif olmayan sohbetlerde unread sayısı artsın
+- Aktif sohbette kullanıcı mesajı gördüğünde unread sıfırlansın
+- Browser notification için permission akışı ekle
+- Notification sound ayarı settings ekranına eklenebilir
+
+Öncelik:
+- gerçek mesajlaşma hissi
+- premium UX
+- profil kişiselleştirme
+- uygulama dışındayken bile yaşayan bir sohbet deneyimi

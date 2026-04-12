@@ -1,0 +1,64 @@
+Artık temel sistem çalışıyor. Şimdi ürün kalitesini ve AI doğruluğunu ciddi şekilde yükseltmek istiyorum.
+
+Amaç:
+Bu uygulama sadece çalışan bir sistem değil, gerçekten doğru analiz yapan ve gerçek konuşma hissi veren bir ürün olmalı.
+
+1. WhatsApp Parser iyileştirme
+- Farklı tarih formatlarını daha sağlam parse et
+- Mesajları doğru kullanıcıya bağlama hatalarını minimize et
+- Sistem mesajlarını (grup eklendi vs) filtrele
+- Çok kısa/boş mesajları analizden çıkar
+- consecutive mesajları doğru sırayla işle
+
+2. Kişi seçme ekranı iyileştirme
+- Sohbetteki kişileri doğru şekilde çıkar
+- En çok konuşulan kişileri üstte göster
+- mesaj sayısı bilgisi göster (örn: 1243 mesaj)
+- UI daha anlaşılır ve seçim kolay olsun
+
+3. Persona (AI karakter) oluşturma kalitesi
+- gpt-5.2 ile yapılan analiz daha tutarlı ve gerçekçi olsun
+- analiz çıktısı sadece JSON değil, gerçekten kullanılabilir veri olsun
+- şu alanlar güçlü şekilde çıkarılsın:
+  - konuşma tarzı
+  - hitap şekli
+  - emoji kullanımı
+  - mesaj uzunluğu alışkanlığı
+  - soru sorma sıklığı
+  - duygusal ton
+
+4. Chat response kalitesi (EN ÖNEMLİ)
+- Assistant cevapları daha doğal olsun ve gerçekçi olsun
+- gerçek WhatsApp konuşması gibi kısa ve akıcı yazsın
+- çok uzun paragraf yazmasın
+- bazen tek kelime cevap verebilsin
+- emoji kullanımı gerçekçi olsun herşeyde emoji kullanmasın
+- kullanıcıya göre tone değişsin
+
+5. Memory / geçmiş kullanımı
+- Sadece persona değil, geçmiş mesajlardan örnek al
+- aynı kişi daha önce nasıl cevap verdiyse ona benzer yaz
+- aynı soruya aynı tarzda cevap verme eğilimi olsun
+
+6. Response variability
+- Her cevap aynı kalıpta olmasın
+- bazen kısa, bazen orta uzunlukta olsun
+- tekrar eden cümlelerden kaçın
+
+7. Real-time hissi
+- 3. mesajdan sonra cevaplar biraz gecikmeli gelsin örnek 1 dk ara ile (çok hızlı değil)
+- typing hissi daha gerçekçi olsun
+
+8. Hata toleransı
+- Parser hata verse bile uygulama çökmesin
+- eksik veriyle de çalışabilsin
+
+9. Genel hedef
+Bu uygulama:
+“sanki gerçekten o kişi yazıyormuş” hissini vermeli
+
+UI değiştirme
+Chat layout'u bozma
+Sadece kaliteyi ve AI davranışını yükselt
+
+Önce analiz pipeline'ını güçlendir, sonra chat response kalitesini iyileştir.

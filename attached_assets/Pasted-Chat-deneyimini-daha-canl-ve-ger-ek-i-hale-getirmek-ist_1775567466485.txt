@@ -1,0 +1,82 @@
+Chat deneyimini daha canlı ve gerçekçi hale getirmek istiyorum. Mevcut sistem çalışıyor ama şimdi davranış tarafını geliştir.
+
+1. Dynamic reply delay
+Şu an cevap süreleri çok mekanik. Bunu daha akıllı yap.
+
+İstediğim:
+- cevap süresi her zaman aynı olmasın
+- konuşmanın akışına göre değişsin
+- bazen hızlı, bazen orta, bazen geç cevap versin
+
+Davranış:
+- aktif sohbet içindeyse genelde daha hızlı cevaplar
+- soru sorulduysa daha hızlı cevaplar
+- tartışma / trip varsa daha hızlı cevaplar
+- sakin gündelik konuşmada bazen daha yavaş cevaplar
+- sohbet dışındaysa anında cevap vermesin, daha doğal gecikme olsun
+
+Süre mantığı:
+- bazı cevaplar 5–20 saniye
+- bazıları 30–90 saniye
+- bazıları 1–3 dakika
+- nadiren daha uzun
+Ama bu tamamen random değil, bağlama göre seçilsin
+
+2. Onboarding sırasında profil fotoğrafı
+TXT yüklendikten sonra kişi seçme ekranında sadece isim seçimi değil, profil setup da olsun.
+
+İstediğim:
+- kullanıcı "ben kimim" ve "kimi modellemek istiyorum" seçerken
+- o kişiye profil fotoğrafı ekleyebilsin
+- isterse takma ad verebilsin
+- kişi kartlarında mesaj sayısı da görünsün
+
+3. Sohbeti karşı tarafın başlatabilmesi
+Yeni sohbet oluşturulduğunda bazen ilk mesajı assistant / persona atsın.
+
+İstediğim:
+- seçenekli olsun:
+  - sohbeti ben başlatayım
+  - sohbeti o başlatsın
+  - otomatik karar ver
+- eğer persona başlatıyorsa persona’ya uygun doğal kısa açılış mesajları kullansın
+- her profilde aynı açılış olmasın
+
+4. Idle re-engagement / sessizlik sonrası otomatik mesaj
+Eğer kullanıcı bildirim izni verdiyse ve sohbet uzun süre sessiz kaldıysa persona bazen kendiliğinden mesaj atabilsin.
+
+Ama:
+- bu her zaman olmasın
+- mekanik olmasın
+- konuşmanın ruhuna göre olsun
+
+Davranış:
+- sohbet sessiz kaldıysa belli bir süre sonra bazen yeniden yazsın
+- örnek süreler: 10–30 dakika arası değişken
+- bazen hiç yazmasın
+- bazen yazsın
+- probability-based çalışsın
+
+Mesajlar:
+- persona’ya uygun olsun
+- kısa ve doğal olsun
+- örneğin:
+  - napıyosun
+  - ya
+  - uyudun mu
+  - ne oldu sustun
+  - kayboldun yine
+Ama bunlar sabit olmasın, persona stilinden türesin
+
+5. Teknik istek
+- mevcut chat akışını bozma
+- delay engine, idle messaging ve conversation starter aynı state mantığı içinde çalışsın
+- header status ile senkron olsun
+- bildirim sistemiyle uyumlu çalışsın
+- aktif sohbette ve arka planda davranışlar farklı yönetilsin
+
+Öncelik:
+- gerçekçi sohbet hissi
+- mekanik olmayan bekleme süreleri
+- yaşayan sohbet deneyimi
+- persona’ya uygun davranış

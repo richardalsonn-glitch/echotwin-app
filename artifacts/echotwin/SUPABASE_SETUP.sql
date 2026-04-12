@@ -1,0 +1,163 @@
+-- ========================================================
+-- EchoTwin — Supabase SQL Setup
+-- Supabase Dashboard > SQL Editor'da çalıştır
+-- ========================================================
+
+-- 1. User Profiles (auth.users'ı extend eder)
+create table if not exists public.user_profiles (
+  id uuid references auth.users(id) on delete cascade primary key,
+  display_name text,
+  avatar_url text,
+  subscription_tier text not null default 'free' check (subscription_tier in ('free', 'basic', 'full')),
+  subscription_expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_profiles enable row level security;
+
+create policy "Users can view own profile"
+  on public.user_profiles for select
+  using (auth.uid() = id);
+
+create policy "Users can update own profile"
+  on public.user_profiles for update
+  using (auth.uid() = id);
+
+create policy "Users can insert own profile"
+  on public.user_profiles for insert
+  with check (auth.uid() = id);
+
+-- 2. Chat Exports (parsed WhatsApp files)
+create table if not exists public.chat_exports (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  file_name text not null,
+  participants jsonb not null default '[]',
+  message_count integer not null default 0,
+  parsed_data jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.chat_exports enable row level security;
+
+create policy "Users can manage own chat exports"
+  on public.chat_exports for all
+  using (auth.uid() = user_id);
+
+-- 3. Message Cache (for AI analysis)
+create table if not exists public.chat_messages_cache (
+  id uuid primary key default gen_random_uuid(),
+  export_id uuid references public.chat_exports(id) on delete cascade not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  messages jsonb not null default '[]',
+  created_at timestamptz not null default now()
+);
+
+alter table public.chat_messages_cache enable row level security;
+
+create policy "Users can manage own message cache"
+  on public.chat_messages_cache for all
+  using (auth.uid() = user_id);
+
+-- 4. Personas (AI clones)
+create table if not exists public.personas (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  export_id uuid references public.chat_exports(id) on delete set null,
+  target_name text not null,
+  requester_name text not null,
+  display_name text not null,
+  avatar_url text,
+  analysis jsonb,
+  message_count_used integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.personas enable row level security;
+
+create policy "Users can manage own personas"
+  on public.personas for all
+  using (auth.uid() = user_id);
+
+-- 5. Messages (chat history)
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  persona_id uuid references public.personas(id) on delete cascade not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.messages enable row level security;
+
+create policy "Users can manage own messages"
+  on public.messages for all
+  using (auth.uid() = user_id);
+
+-- 6. Auto-create user_profile on signup
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.user_profiles (id, display_name)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1))
+  );
+  return new;
+end;
+$$;
+
+create or replace trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- ========================================================
+-- 7. Storage bucket for profile photos (avatars)
+-- ========================================================
+
+-- Create public avatars bucket
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+-- Public read access
+create policy "Avatars are publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+-- Authenticated users can upload to their own folder
+create policy "Users can upload own avatars"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- Authenticated users can update their own avatars
+create policy "Users can update own avatars"
+  on storage.objects for update
+  using (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- Authenticated users can delete their own avatars
+create policy "Users can delete own avatars"
+  on storage.objects for delete
+  using (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- ========================================================
+-- DONE! Tabloları kontrol et:
+-- Table Editor'da user_profiles, chat_exports,
+-- chat_messages_cache, personas, messages tablolarını görmelisin
+-- Storage > Buckets'ta "avatars" bucket'ını görmelisin
+-- ========================================================

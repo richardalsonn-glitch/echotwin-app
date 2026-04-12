@@ -1,0 +1,106 @@
+Ana ekranı tamamen premium, modern ve bağımlılık yaratan bir deneyime dönüştürmek istiyorum.
+
+Mevcut sistem çalışıyor, ama home screen artık gerçek bir ürün gibi hissettirmeli.
+Amaç:
+- kullanıcı uygulamayı açınca wow etkisi alsın
+- sıradan dashboard gibi görünmesin
+- modern, duygusal, kişisel, premium his versin
+- aynı zamanda çok kullanışlı olsun
+
+Marka:
+Bendeki Sen
+
+Tasarım hissi:
+- premium
+- modern
+- kişisel
+- biraz duygusal
+- sıcak ama ucuz durmayan
+- mobil uygulama gibi
+- addictive / tekrar açtıran
+
+Genel stil:
+- dark premium theme
+- derin lacivert / gece mavisi taban
+- turkuaz / camgöbeği aksanlar
+- yumuşak beyaz metinler
+- güçlü ama sade tipografi
+- iyi spacing
+- iyi gölgeler
+- büyük radius
+- hafif glass / soft blur etkileri olabilir ama abartma
+
+Ana ekranı yeniden tasarla.
+
+İstediğim bölümler:
+
+1. Hero / üst karşılama alanı
+- ekranın üst kısmı güçlü olsun
+- kullanıcıyı ismiyle karşılasın
+- örnek:
+  - "Merhaba Fatih"
+  - altına kısa sıcak bir cümle
+- burada uygulamanın duygusu hissedilsin
+- premium bir görsel derinlik olsun
+
+2. Ana CTA kartı
+- "Yeni Sohbet Yükle" alanı çok güçlü ve dikkat çekici olsun
+- sıradan buton değil, premium büyük kart gibi dursun
+- kullanıcı burayı görünce direkt tıklamak istesin
+
+3. Konuşmalar / kayıtlı kişiler listesi
+- WhatsApp benzeri ama daha premium bir liste
+- avatar, isim, son mesaj önizlemesi, saat, unread badge
+- unread badge daha şık olsun
+- son mesaj preview metinleri güzel truncate edilsin
+- aktif / yaşayan bir sohbet listesi hissi versin
+- liste çok basic görünmesin
+
+4. Hızlı erişim alanı
+- örnek:
+  - Yeni Sohbet
+  - Son Kaldığın Sohbet
+  - Premium’a Geç
+  - Bildirim Ayarları
+- mini modern kartlar veya pills olabilir
+
+5. Insight / analiz kartı
+- kullanıcının persona sayısı, aktif sohbet sayısı, okunmamış mesaj sayısı gibi küçük özetler
+- ama dashboard kutu kalabalığı gibi değil, şık ve premium görünsün
+
+6. Empty state'ler
+- eğer hiç sohbet yoksa çok premium bir boş durum tasarla
+- sadece "No chats" yazmasın
+- sıcak ve etkileyici bir metin olsun
+- örneğin:
+  - "Bir sohbet yükle, gerisi bizde"
+- iyi bir illüstrasyon / abstract visual hissi olabilir
+
+7. Premium / upgrade kartı
+- çok basit CTA olmasın
+- premium paketi çekici gösterecek şık bir alan olsun
+- ama fazla bağırmasın
+- doğal ve premium hissedilsin
+
+8. Alt navigation / layout polish
+- mobil uygulama hissi verecek şekilde düzenle
+- spacing çok iyi olsun
+- tappable alanlar rahat olsun
+- home screen gerçekten native app gibi hissettirsin
+
+9. Mikro etkileşimler
+- kart hover / tap feedback
+- unread badge animasyonu hafif olabilir
+- yeni mesaj geldiğinde liste güncellemesi daha akıcı olsun
+- ama performansı bozma
+
+10. Teknik istek
+- mevcut işlevselliği bozma
+- sadece kozmetik değil, gerçek UX iyileştirmesi yap
+- tüm bileşenler responsive ve mobile-first olsun
+- kullanılan renk, spacing, typography tutarlı bir design system oluştursun
+
+Öncelik:
+- home screen premium görünsün
+- uygulama açıldığında bağımlılık yaratan bir his versin
+- modern ve yayınlanabilir kaliteye gelsin
