@@ -86,9 +86,9 @@ async function compressImage(file: File): Promise<Blob> {
 
 function SelectPageContent() {
   const router = useRouter();
-  const params = useSearchParams();
-  const exportId = params.get("export_id") ?? "";
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const params = useSearchParams();
+const exportId = params?.get("export_id") ?? "";
+const fileInputRef = useRef<HTMLInputElement>(null);
 
   let participants: string[] = [];
   try {
