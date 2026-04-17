@@ -8,15 +8,15 @@
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-"dependencies": {
-  "@supabase/ssr": "^0.6.1",
-  "@supabase/supabase-js": "^2.50.0",
-  "next": "^15.3.4",
-  "openai": "^4.104.0",
-  "react": "catalog:",
-  "react-dom": "catalog:",
-  "recharts": "^2.15.4"
-},
+  "dependencies": {
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.50.0",
+    "next": "^15.3.4",
+    "openai": "^4.104.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "recharts": "^2.15.4"
+  },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.4",
