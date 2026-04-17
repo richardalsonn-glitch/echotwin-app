@@ -8,7 +8,6 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Env yoksa middleware siteyi çökertmesin
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.next();
   }
@@ -72,3 +71,4 @@ export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
+};
