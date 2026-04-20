@@ -36,7 +36,7 @@ export function getAiErrorResponse(error: unknown): AiErrorResponse {
       code: "openai_quota_exceeded",
       status: 429,
       message:
-        "OpenAI API kotasi dolmus veya billing/limit ayari yetersiz. OpenAI Platform > Billing ve Usage Limits alanindan kredi, odeme yontemi ve aylik harcama limitini kontrol et.",
+        "AI API kotasi dolmus veya billing/limit ayari yetersiz. Kullandigin saglayicinin kredi, odeme yontemi ve aylik harcama limitini kontrol et.",
     };
   }
 
@@ -45,7 +45,7 @@ export function getAiErrorResponse(error: unknown): AiErrorResponse {
       code: "openai_rate_limited",
       status: 429,
       message:
-        "OpenAI API su anda cok fazla istek aliyor. Biraz bekleyip tekrar dene.",
+        "AI API su anda cok fazla istek aliyor. Biraz bekleyip tekrar dene.",
     };
   }
 
@@ -54,7 +54,7 @@ export function getAiErrorResponse(error: unknown): AiErrorResponse {
       code: "openai_auth_failed",
       status: 500,
       message:
-        "OpenAI API anahtari gecersiz veya eksik. AI_INTEGRATIONS_OPENAI_API_KEY degerini kontrol et.",
+        "AI API anahtari gecersiz veya eksik. OPENROUTER_API_KEY veya AI_INTEGRATIONS_OPENAI_API_KEY degerini kontrol et.",
     };
   }
 

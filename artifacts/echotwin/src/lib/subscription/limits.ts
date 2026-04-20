@@ -7,7 +7,7 @@ export interface TierLimits {
   canEditDisplayName: boolean;
   canDeletePersona: boolean;
   canAddNewPersona: boolean;
-  aiModel: "gpt-5-mini" | "gpt-5.2";
+  aiModel: string;
   canUploadVoice: boolean;
   hasRelationshipAnalysis: boolean;
   hasSoundAnalysis: boolean;

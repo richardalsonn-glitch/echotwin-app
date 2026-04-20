@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
           await new Promise((resolve) => setTimeout(resolve, Math.min(typingDelay, 2000)));
 
           const aiStream = await openai.chat.completions.create({
-            model: limits.aiModel,
+            model: process.env.AI_CHAT_MODEL ?? limits.aiModel,
             max_completion_tokens: 512,
             stream: true,
             messages: [
