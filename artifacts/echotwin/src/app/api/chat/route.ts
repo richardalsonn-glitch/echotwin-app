@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { openai } from "@/lib/ai/client";
+import { getAiErrorResponse } from "@/lib/ai/errors";
 import { buildChatSystemPrompt, calculateTypingDelay } from "@/lib/ai/prompts";
 import { canSendMessage, getLimits } from "@/lib/subscription/limits";
 import type { PersonaAnalysis } from "@/types/persona";
@@ -148,9 +149,12 @@ export async function POST(request: NextRequest) {
             encoder.encode(`data: ${JSON.stringify({ type: "done", message_count_used: persona.message_count_used + 1 })}\n\n`)
           );
         } catch (error) {
-          const msg = error instanceof Error ? error.message : "AI hatası";
+          const aiError = getAiErrorResponse(error);
+          const msg = aiError.message;
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "error", message: msg })}\n\n`)
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "error", message: msg, code: aiError.code })}\n\n`
+            )
           );
         } finally {
           controller.close();

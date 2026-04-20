@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { openai } from "@/lib/ai/client";
+import { getAiErrorResponse } from "@/lib/ai/errors";
 import { buildAnalysisPrompt } from "@/lib/ai/prompts";
 import type { PersonaAnalysis } from "@/types/persona";
 
@@ -71,20 +72,29 @@ export async function POST(request: NextRequest) {
     );
 
     // Call AI for persona extraction
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5.2",
-      max_completion_tokens: 2048,
-      messages: [
-        {
-          role: "system",
-          content: "Sen bir iletişim analistisin. Yalnızca geçerli JSON döndür, başka hiçbir şey yazma.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    });
+    let completion;
+    try {
+      completion = await openai.chat.completions.create({
+        model: process.env.AI_ANALYSIS_MODEL ?? "gpt-5.2",
+        max_completion_tokens: 2048,
+        messages: [
+          {
+            role: "system",
+            content: "Sen bir iletişim analistisin. Yalnızca geçerli JSON döndür, başka hiçbir şey yazma.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      });
+    } catch (error) {
+      const aiError = getAiErrorResponse(error);
+      return NextResponse.json(
+        { error: aiError.message, code: aiError.code },
+        { status: aiError.status }
+      );
+    }
 
     const rawResponse = completion.choices[0]?.message?.content ?? "";
 
