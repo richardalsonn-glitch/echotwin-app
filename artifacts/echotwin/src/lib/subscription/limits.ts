@@ -7,7 +7,6 @@ export interface TierLimits {
   canEditDisplayName: boolean;
   canDeletePersona: boolean;
   canAddNewPersona: boolean;
-  aiModel: string;
   canUploadVoice: boolean;
   hasRelationshipAnalysis: boolean;
   hasSoundAnalysis: boolean;
@@ -23,7 +22,6 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     canEditDisplayName: false,
     canDeletePersona: false,
     canAddNewPersona: false,
-    aiModel: "openai/gpt-oss-120b:free",
     canUploadVoice: false,
     hasRelationshipAnalysis: false,
     hasSoundAnalysis: false,
@@ -37,7 +35,6 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     canEditDisplayName: true,
     canDeletePersona: true,
     canAddNewPersona: true,
-    aiModel: "openai/gpt-oss-120b:free",
     canUploadVoice: false,
     hasRelationshipAnalysis: true,
     hasSoundAnalysis: false,
@@ -51,7 +48,6 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     canEditDisplayName: true,
     canDeletePersona: true,
     canAddNewPersona: true,
-    aiModel: "openai/gpt-oss-120b:free",
     canUploadVoice: true,
     hasRelationshipAnalysis: true,
     hasSoundAnalysis: true,

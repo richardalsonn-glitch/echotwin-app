@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { openai } from "@/lib/ai/client";
 import { getAiErrorResponse } from "@/lib/ai/errors";
+import { runPersonaAnalysis } from "@/lib/ai/agent";
 import { buildAnalysisPrompt } from "@/lib/ai/prompts";
-import type { PersonaAnalysis } from "@/types/persona";
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,46 +70,7 @@ export async function POST(request: NextRequest) {
       messages
     );
 
-    // Call AI for persona extraction
-    let completion;
-    try {
-      completion = await openai.chat.completions.create({
-        model: process.env.AI_ANALYSIS_MODEL ?? "openai/gpt-oss-120b:free",
-        max_completion_tokens: 2048,
-        temperature: 0.2,
-        messages: [
-          {
-            role: "system",
-            content: "Sen bir iletişim analistisin. Yalnızca geçerli JSON döndür, başka hiçbir şey yazma.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      });
-    } catch (error) {
-      const aiError = getAiErrorResponse(error);
-      return NextResponse.json(
-        { error: aiError.message, code: aiError.code },
-        { status: aiError.status }
-      );
-    }
-
-    const rawResponse = completion.choices[0]?.message?.content ?? "";
-
-    // Strict JSON parse
-    let analysis: PersonaAnalysis;
-    try {
-      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("JSON bulunamadı");
-      analysis = JSON.parse(jsonMatch[0]) as PersonaAnalysis;
-    } catch {
-      return NextResponse.json(
-        { error: "AI analizi JSON olarak parse edilemedi. Tekrar dene." },
-        { status: 500 }
-      );
-    }
+    const { analysis } = await runPersonaAnalysis({ prompt });
 
     // Save analysis to persona
     const { data: updatedPersona, error: updateError } = await supabase
@@ -130,7 +90,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ persona: updatedPersona, analysis });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Bilinmeyen hata";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const aiError = getAiErrorResponse(error);
+    return NextResponse.json(
+      { error: aiError.message, code: aiError.code },
+      { status: aiError.status }
+    );
   }
 }

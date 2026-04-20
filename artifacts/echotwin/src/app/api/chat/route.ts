@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { openai } from "@/lib/ai/client";
 import { getAiErrorResponse } from "@/lib/ai/errors";
+import { runPersonaChat } from "@/lib/ai/agent";
 import { buildChatSystemPrompt, calculateTypingDelay } from "@/lib/ai/prompts";
-import { canSendMessage, getLimits } from "@/lib/subscription/limits";
+import { canSendMessage } from "@/lib/subscription/limits";
 import type { PersonaAnalysis } from "@/types/persona";
 
 export async function POST(request: NextRequest) {
@@ -73,7 +73,6 @@ export async function POST(request: NextRequest) {
       content: m.content,
     }));
 
-    const limits = getLimits(tier);
     const systemPrompt = buildChatSystemPrompt(
       persona.target_name,
       persona.requester_name,
@@ -105,28 +104,19 @@ export async function POST(request: NextRequest) {
           // Small artificial delay for natural feel
           await new Promise((resolve) => setTimeout(resolve, Math.min(typingDelay, 2000)));
 
-          const aiStream = await openai.chat.completions.create({
-            model: process.env.AI_CHAT_MODEL ?? limits.aiModel,
-            max_completion_tokens: 512,
-            temperature: 0.45,
-            stream: true,
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...conversationHistory,
-              { role: "user", content: message.trim() },
-            ],
+          const aiResult = await runPersonaChat({
+            systemPrompt,
+            conversationHistory,
+            userMessage: message.trim(),
           });
 
           let fullResponse = "";
 
-          for await (const chunk of aiStream) {
-            const content = chunk.choices[0]?.delta?.content;
-            if (content) {
-              fullResponse += content;
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ type: "chunk", content })}\n\n`)
-              );
-            }
+          for await (const content of aiResult.stream) {
+            fullResponse += content;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "chunk", content })}\n\n`)
+            );
           }
 
           // Save assistant message and increment counter
@@ -171,7 +161,10 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Bilinmeyen hata";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const aiError = getAiErrorResponse(error);
+    return NextResponse.json(
+      { error: aiError.message, code: aiError.code },
+      { status: aiError.status }
+    );
   }
 }
