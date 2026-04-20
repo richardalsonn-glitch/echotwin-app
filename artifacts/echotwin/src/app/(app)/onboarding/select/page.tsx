@@ -109,6 +109,15 @@ try {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  function handleSelectTarget(name: string) {
+    const otherParticipant =
+      participants.length === 2 ? participants.find((p) => p !== name) ?? "" : "";
+
+    setSelectedTarget(name);
+    setDisplayName(name);
+    if (otherParticipant) setRequesterName(otherParticipant);
+  }
+
   function handleAvatarPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -221,7 +230,7 @@ try {
       <div className="flex-1 px-5 py-7 space-y-7">
         {/* Title */}
         <div>
-          <h2 className="text-2xl font-bold tracking-tight mb-1.5">Kimi aramak istiyorsun?</h2>
+          <h2 className="text-2xl font-bold tracking-tight mb-1.5">Kiminle sohbet etmek istiyorsun?</h2>
           <p className="text-muted-foreground text-sm">
             Sohbette {participants.length} kişi var —{" "}
             <span className="text-foreground/70">en çok yazan üstte</span>
@@ -247,12 +256,7 @@ try {
                       : "border-border/40 bg-card/50 hover:border-primary/25 hover:bg-card/70"
                   }`}
                   onClick={() => {
-                    setSelectedTarget(name);
-                    if (!displayName) setDisplayName(name);
-                    if (!requesterName && participants.length === 2) {
-                      const other = participants.find((p) => p !== name);
-                      if (other) setRequesterName(other);
-                    }
+                    handleSelectTarget(name);
                   }}
                 >
                   <Avatar className={`h-11 w-11 shrink-0 border ${colorClass}`}>
@@ -345,7 +349,7 @@ try {
 
               <div className="space-y-1.5">
                 <Label htmlFor="displayName" className="text-sm font-medium text-foreground/70">
-                  Takma Ad / Profil Adı
+                  Onun Sohbet Adı
                 </Label>
                 <Input
                   id="displayName"
@@ -380,7 +384,7 @@ try {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="displayName" className="text-sm font-medium text-foreground/70">
-                Profil Adı
+                Onun Sohbet Adı
               </Label>
               <Input
                 id="displayName"

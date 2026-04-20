@@ -7,12 +7,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Crown, Lock, Loader2, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, Crown, Lock, Loader2, Check, CheckCheck, Mic, Square } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
+import {
+  createAudioFile,
+  discardAudioRecording,
+  getAudioRecorderUserMessage,
+  MAX_AUDIO_BYTES,
+  MAX_RECORDING_MS,
+  MIN_AUDIO_BYTES,
+  startAudioRecording,
+  stopAudioRecording,
+  type AudioRecorderSession,
+} from "@/lib/audio/recorder";
 import {
   clearUnread,
   incrementUnread,
@@ -28,6 +39,7 @@ const FREE_LIMIT = 5;
 
 type MessageStatus = "sent" | "delivered" | "read";
 type PresenceState = "idle" | "online" | "typing" | "recent_online";
+type VoiceInputStatus = "idle" | "recording" | "transcribing";
 
 interface DisplayMessage extends ChatMessage {
   status?: MessageStatus;
@@ -79,6 +91,22 @@ function PresenceLabel({
 
 /* ─── Main component ─────────────────────────────────────── */
 
+function getObjectValue(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function getTranscribedText(value: unknown): string | null {
+  const data = getObjectValue(value);
+  return typeof data.text === "string" && data.text.trim() ? data.text.trim() : null;
+}
+
+function getTranscribeError(value: unknown): string {
+  const data = getObjectValue(value);
+  return typeof data.error === "string" && data.error.trim()
+    ? data.error.trim()
+    : "Ses mesajı okunamadı, tekrar dene";
+}
+
 export default function ChatPage({
   params,
 }: {
@@ -90,6 +118,8 @@ export default function ChatPage({
   const inputRef = useRef<HTMLInputElement>(null);
   const presenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduledTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const recordingSessionRef = useRef<AudioRecorderSession | null>(null);
+  const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [persona, setPersona] = useState<Persona | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -104,6 +134,8 @@ export default function ChatPage({
   const [lastSeenAt, setLastSeenAt] = useState<Date>(new Date());
   const [startingConvo, setStartingConvo] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>("idle");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -129,11 +161,23 @@ export default function ChatPage({
     scheduledTimersRef.current = [];
   }
 
+  function clearRecordingTimeout() {
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+  }
+
   useEffect(
     () => () => {
       clearPresenceTimer();
       clearScheduledTimers();
+      clearRecordingTimeout();
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (recordingSessionRef.current) {
+        discardAudioRecording(recordingSessionRef.current);
+        recordingSessionRef.current = null;
+      }
     },
     []
   );
@@ -154,15 +198,22 @@ export default function ChatPage({
         if (!res.ok) return;
         const data = await res.json();
         if (data.message?.content) {
+          const serverMsg = data.message as Partial<ChatMessage>;
           const idleMsg: DisplayMessage = {
-            id: `ai-idle-${Date.now()}`,
-            persona_id: personaId,
-            user_id: "",
+            id: serverMsg.id ?? `ai-idle-${Date.now()}`,
+            persona_id: serverMsg.persona_id ?? personaId,
+            user_id: serverMsg.user_id ?? "",
             role: "assistant",
             content: data.message.content,
-            created_at: new Date().toISOString(),
+            created_at: serverMsg.created_at ?? new Date().toISOString(),
           };
           setMessages((prev) => [...prev, idleMsg]);
+          if (data.message_count_used !== undefined) {
+            setPersona((p) =>
+              p ? { ...p, message_count_used: data.message_count_used } : p
+            );
+            if (data.message_count_used >= FREE_LIMIT) void checkLimit();
+          }
           setPresence("recent_online");
           presenceTimerRef.current = setTimeout(() => {
             setLastSeenAt(new Date());
@@ -228,13 +279,13 @@ export default function ChatPage({
 
       const data = await res.json();
       const incoming: DisplayMessage[] = (data.messages ?? []).map(
-        (m: { role: string; content: string }, i: number) => ({
-          id: `ai-start-${Date.now()}-${i}`,
-          persona_id: personaId,
-          user_id: "",
-          role: m.role,
+        (m: Partial<ChatMessage> & { role: string; content: string }, i: number) => ({
+          id: m.id ?? `ai-start-${Date.now()}-${i}`,
+          persona_id: m.persona_id ?? personaId,
+          user_id: m.user_id ?? "",
+          role: m.role as "user" | "assistant",
           content: m.content,
-          created_at: new Date().toISOString(),
+          created_at: m.created_at ?? new Date().toISOString(),
         })
       );
 
@@ -253,6 +304,12 @@ export default function ChatPage({
       if (incoming.length > 0) {
         const last = incoming[incoming.length - 1];
         onResponseDelivered(last.content, persona?.display_name ?? "AI", persona?.avatar_url ?? undefined);
+      }
+      if (data.message_count_used !== undefined) {
+        setPersona((p) =>
+          p ? { ...p, message_count_used: data.message_count_used } : p
+        );
+        if (data.message_count_used >= FREE_LIMIT) void checkLimit();
       }
     } catch {
       toast.error("Bağlantı hatası");
@@ -331,8 +388,90 @@ export default function ChatPage({
   }
 
   /* ── Send ── */
-  async function sendMessage() {
-    const content = input.trim();
+  async function handleVoiceButtonClick() {
+    if (voiceStatus === "recording") {
+      await finishVoiceRecording();
+      return;
+    }
+
+    if (voiceStatus !== "idle" || sending || limitReached) return;
+    await startVoiceInput();
+  }
+
+  async function startVoiceInput() {
+    try {
+      setVoiceError(null);
+      const session = await startAudioRecording();
+      recordingSessionRef.current = session;
+      setVoiceStatus("recording");
+      recordingTimeoutRef.current = setTimeout(() => {
+        void finishVoiceRecording();
+      }, MAX_RECORDING_MS);
+    } catch (error) {
+      const message = getAudioRecorderUserMessage(error);
+      console.warn("[voice-input] recording failed", error);
+      setVoiceStatus("idle");
+      setVoiceError(message);
+      toast.error(message);
+    }
+  }
+
+  async function finishVoiceRecording() {
+    const session = recordingSessionRef.current;
+    if (!session) return;
+    recordingSessionRef.current = null;
+
+    clearRecordingTimeout();
+    setVoiceStatus("transcribing");
+    setVoiceError(null);
+
+    try {
+      const audioBlob = await stopAudioRecording(session);
+
+      if (audioBlob.size < MIN_AUDIO_BYTES) {
+        throw new Error("Ses mesajı okunamadı, tekrar dene");
+      }
+
+      if (audioBlob.size > MAX_AUDIO_BYTES) {
+        throw new Error("Ses kaydı çok uzun, daha kısa tekrar dene");
+      }
+
+      const formData = new FormData();
+      formData.append("audio", createAudioFile(audioBlob));
+
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      const data: unknown = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(getTranscribeError(data));
+      }
+
+      const transcript = getTranscribedText(data);
+      if (!transcript) {
+        throw new Error("Ses mesajı okunamadı, tekrar dene");
+      }
+
+      setVoiceStatus("idle");
+      setVoiceError(null);
+      await sendMessage(transcript);
+    } catch (error) {
+      console.warn("[voice-input] transcription failed", error);
+      recordingSessionRef.current = null;
+      setVoiceStatus("idle");
+      const rawMessage = error instanceof Error ? error.message : "";
+      const message = rawMessage.startsWith("Ses ")
+        ? rawMessage
+        : "Ses mesajı okunamadı, tekrar dene";
+      setVoiceError(message);
+      toast.error(message);
+    }
+  }
+
+  async function sendMessage(messageOverride?: string) {
+    const content = (messageOverride ?? input).trim();
     if (!content || sending || limitReached) return;
 
     // Clear any pending idle re-engagement when user actively sends
@@ -341,7 +480,7 @@ export default function ChatPage({
       idleTimerRef.current = null;
     }
 
-    setInput("");
+    if (messageOverride === undefined) setInput("");
     setSending(true);
 
     const optId = `opt-${Date.now()}`;
@@ -529,14 +668,28 @@ export default function ChatPage({
 
               scheduledTimersRef.current.push(t1, t2, t3);
             } else if (event.type === "done") {
-              // Immediate mode: fire sound/notification once, using accumulated response
               setIsTyping(false);
               setStreamingContent("");
-              setMessages((prev) =>
-                prev.map((m) =>
+              setMessages((prev) => {
+                const withReadStatus = prev.map((m) =>
                   m.id === optId ? { ...m, status: "read" as MessageStatus } : m
-                )
-              );
+                );
+
+                const text = (fullResponse || event.content || "").trim();
+                if (!text) return withReadStatus;
+
+                return [
+                  ...withReadStatus,
+                  {
+                    id: `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    persona_id: personaId,
+                    user_id: "",
+                    role: "assistant",
+                    content: text,
+                    created_at: new Date().toISOString(),
+                  },
+                ];
+              });
               if (event.message_count_used !== undefined) {
                 setPersona((p) =>
                   p ? { ...p, message_count_used: event.message_count_used! } : p
@@ -631,6 +784,13 @@ export default function ChatPage({
     presence === "online" ||
     presence === "recent_online" ||
     presence === "typing";
+  const voiceStatusText =
+    voiceStatus === "recording"
+      ? "Dinliyorum..."
+      : voiceStatus === "transcribing"
+      ? "Ses çözümleniyor..."
+      : voiceError;
+  const textSendDisabled = !input.trim() || sending || voiceStatus !== "idle";
 
   return (
     <div className="max-w-md mx-auto flex flex-col h-screen" style={{ background: "#0B1220" }}>
@@ -949,7 +1109,7 @@ export default function ChatPage({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    void sendMessage();
+                    if (voiceStatus === "idle") void sendMessage();
                   }
                 }}
                 disabled={sending}
@@ -958,19 +1118,52 @@ export default function ChatPage({
               />
             </div>
             <button
+              type="button"
+              aria-label={voiceStatus === "recording" ? "Kaydı bitir" : "Sesli mesaj kaydet"}
+              title={voiceStatus === "recording" ? "Kaydı bitir" : "Sesli mesaj kaydet"}
               className="h-11 w-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 disabled:opacity-40"
               style={{
                 background:
-                  input.trim() && !sending
+                  voiceStatus === "recording"
+                    ? "rgba(239,68,68,0.16)"
+                    : voiceStatus === "transcribing"
+                    ? "rgba(20,184,166,0.12)"
+                    : "rgba(255,255,255,0.07)",
+                border:
+                  voiceStatus === "recording"
+                    ? "1px solid rgba(239,68,68,0.35)"
+                    : "1px solid rgba(255,255,255,0.06)",
+                boxShadow:
+                  voiceStatus === "recording"
+                    ? "0 0 18px rgba(239,68,68,0.18)"
+                    : "none",
+              }}
+              onClick={() => void handleVoiceButtonClick()}
+              disabled={sending || voiceStatus === "transcribing"}
+            >
+              {voiceStatus === "transcribing" ? (
+                <Loader2 className="h-4 w-4 text-primary animate-spin" />
+              ) : voiceStatus === "recording" ? (
+                <Square className="h-3.5 w-3.5 text-red-300 fill-red-300" />
+              ) : (
+                <Mic className="h-4 w-4 text-white/75" />
+              )}
+            </button>
+            <button
+              type="button"
+              className="h-11 w-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 disabled:opacity-40"
+              style={{
+                background:
+                  !textSendDisabled
                     ? "linear-gradient(135deg, hsl(183 82% 34%), hsl(198 80% 41%))"
                     : "rgba(255,255,255,0.07)",
                 boxShadow:
-                  input.trim() && !sending
+                  !textSendDisabled
                     ? "0 2px 14px rgba(20,184,166,0.35)"
                     : "none",
               }}
               onClick={() => void sendMessage()}
-              disabled={!input.trim() || sending}
+              disabled={textSendDisabled}
             >
               {sending ? (
                 <Loader2 className="h-4 w-4 text-white animate-spin" />
@@ -979,6 +1172,15 @@ export default function ChatPage({
               )}
             </button>
           </div>
+          {voiceStatusText && (
+            <p
+              className={`mt-2 px-1 text-[11.5px] ${
+                voiceError && voiceStatus === "idle" ? "text-red-300" : "text-white/45"
+              }`}
+            >
+              {voiceStatusText}
+            </p>
+          )}
         </div>
       )}
     </div>

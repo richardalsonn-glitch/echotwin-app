@@ -137,7 +137,13 @@ export async function POST(request: NextRequest) {
           ]);
 
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "done", message_count_used: persona.message_count_used + 1 })}\n\n`)
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "done",
+                content: fullResponse,
+                message_count_used: persona.message_count_used + 1,
+              })}\n\n`
+            )
           );
         } catch (error) {
           const aiError = getAiErrorResponse(error);
