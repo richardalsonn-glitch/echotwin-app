@@ -9,6 +9,7 @@ export interface PersonaAnalysis {
   affection_level: number;
   argument_style: string;
   common_phrases: string[];
+  style_examples?: string[];
   response_patterns: {
     tends_to_ask_back: boolean;
     uses_long_messages: boolean;

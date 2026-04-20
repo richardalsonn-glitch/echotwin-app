@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
           const aiStream = await openai.chat.completions.create({
             model: process.env.AI_CHAT_MODEL ?? limits.aiModel,
             max_completion_tokens: 512,
+            temperature: 0.45,
             stream: true,
             messages: [
               { role: "system", content: systemPrompt },

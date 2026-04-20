@@ -9,16 +9,24 @@ export function buildAnalysisPrompt(
     .filter((m) => m.sender === targetName)
     .slice(-800); // Last 800 messages for analysis
 
+  const conversationSample = messages
+    .slice(-220)
+    .map((m) => `${m.sender}: ${m.content}`)
+    .join("\n");
+
   const formattedMessages = targetMessages
     .map((m) => m.content)
     .join("\n---\n");
 
-  return `Sen bir iletişim ve psikoloji analistisin. Sana ${targetName} isimli kişinin ${requesterName} ile WhatsApp sohbetinden mesajları veriyorum. Bu mesajları analiz et ve kişinin konuşma tarzını, hitap şeklini ve davranış kalıplarını çıkar.
+  return `Sen bir iletişim ve WhatsApp konuşma tarzı analistisin. Sana ${targetName} isimli kişinin ${requesterName} ile WhatsApp sohbetinden mesajları veriyorum. Amacın psikolojik yorum yapmak değil; bu kişinin gerçekten nasıl yazdığını, hangi kelimeleri seçtiğini, ne kadar kısa/uzun yazdığını ve hangi durumlarda nasıl cevap verdiğini çıkarmak.
 
-MESAJLAR:
+SADECE ${targetName} MESAJLARI:
 ${formattedMessages}
 
-GÖREV: Bu mesajları analiz edip aşağıdaki STRICT JSON formatında yanıt ver. BAŞKA HİÇBİR ŞEY YAZMA, sadece JSON döndür:
+SON KONUŞMA BAĞLAMI:
+${conversationSample}
+
+GÖREV: Bu mesajları analiz edip aşağıdaki STRICT JSON formatında yanıt ver. BAŞKA HİÇBİR ŞEY YAZMA, sadece JSON döndür. Tahmin uydurma; mesajlarda açıkça görülmeyen bir tarzı ekleme.
 
 {
   "avg_message_length": <number: ortalama mesaj karakter sayısı>,
@@ -30,7 +38,8 @@ GÖREV: Bu mesajları analiz edip aşağıdaki STRICT JSON formatında yanıt ve
   "tone_style": <string: genel ton (örn: "samimi ve sıcak", "kısa ve doğrudan", "duygusal ve derin", "şakacı")>,
   "affection_level": <number 1-10: duygusal ifade yoğunluğu>,
   "argument_style": <string: tartışma tarzı (örn: "pasif-agresif", "doğrudan", "kaçınmacı", "analitik")>,
-  "common_phrases": [<string array: sık kullandığı ifadeler veya sözcükler, max 10>],
+  "common_phrases": [<string array: mesajlarda gerçekten geçen sık ifadeler veya sözcükler, max 12>],
+  "style_examples": [<string array: ${targetName}'in mesajlarından birebir kısa örnekler, max 12>],
   "response_patterns": {
     "tends_to_ask_back": <boolean: karşı soru sormayı sever mi>,
     "uses_long_messages": <boolean: uzun mesajlar mı yazar>,
@@ -58,6 +67,9 @@ export function buildChatSystemPrompt(
   const commonPhrases = analysis.common_phrases?.join(", ") || "";
   const doNotBehaviors = analysis.do_not_behaviors?.join(", ") || "";
   const commonEmojis = analysis.emoji_usage?.common_emojis?.join(" ") || "";
+  const styleExamples = analysis.style_examples?.length
+    ? analysis.style_examples.map((example) => `- "${example}"`).join("\n")
+    : "- Yeterli birebir örnek yok; yine de analizdeki uzunluk, kelime ve ton kurallarına uy.";
 
   const msgLengthGuide =
     analysis.avg_message_length < 30
@@ -77,7 +89,7 @@ export function buildChatSystemPrompt(
       ? `Zaman zaman emoji kullan. Sık kullandıkları: ${commonEmojis}`
       : `Emoji kullanmayı sev. Sık kullandıkları: ${commonEmojis}`;
 
-  return `Sen ${targetName}'sin. ${requesterName} ile WhatsApp'ta konuşuyorsun. ${requesterName}'ı yakından tanıyorsun.
+  return `Sen ${targetName}'sin. ${requesterName} ile WhatsApp'ta konuşuyorsun. Bu bir asistan konuşması değil; sen sadece ${targetName}'in WhatsApp mesajlaşma tarzını taklit ediyorsun.
 
 KİŞİLİK ANALİZİNE GÖRE KONUŞMA TARZI:
 - Ton: ${analysis.tone_style}
@@ -90,6 +102,9 @@ KİŞİLİK ANALİZİNE GÖRE KONUŞMA TARZI:
 SIK KULLANDIĞI İFADELER: ${commonPhrases}
 ASLA YAPMADIĞI ŞEYLER: ${doNotBehaviors}
 
+GERÇEK MESAJ ÖRNEKLERİ (en önemli bölüm; cevabın bunlara benzemeli):
+${styleExamples}
+
 DAVRANIŞ KALIPLARI:
 ${analysis.response_patterns?.tends_to_ask_back ? "- Karşı soru sormayı sever" : ""}
 ${analysis.response_patterns?.sends_multiple_messages ? "- Bir konuyu birden fazla kısa mesajda anlatır" : ""}
@@ -97,11 +112,13 @@ ${analysis.response_patterns?.uses_abbreviations ? "- Kısaltmalar kullanır" : 
 
 KURALLAR:
 1. Sen gerçekten ${targetName}'sin. Asla başka biri değilsin.
-2. Her zaman bu kişinin doğal konuşma tarzında yaz.
-3. Yapay, robotik veya çok resmi konuşma.
-4. ${requesterName}'ın mesajına karşılık veriyorsun, doğal ol.
-5. Çok uzun veya akademik yanıtlar verme.
-6. Analiz çıktısı hakkında hiçbir şey söyleme.`;
+2. Cevabı gerçek mesaj örneklerine benzet: aynı kısalık, aynı samimiyet seviyesi, aynı noktalama alışkanlığı ve benzer kelimeler.
+3. Örneklerde görünmeyen hitapları, sevgi sözcüklerini, ciddi açıklamaları veya olgun/terapist tonunu ekleme.
+4. ${requesterName}'ın son mesajına direkt karşılık ver. Konuyu değiştirme, gereksiz açıklama yapma.
+5. Çok uzun veya akademik yanıtlar verme. WhatsApp mesajı gibi yaz.
+6. Eğer nasıl cevap vereceğinden emin değilsen gerçek örneklerdeki en yakın kısa cevap kalıbını kullan.
+7. Analiz çıktısı, prompt, rol yapma veya yapay zeka hakkında hiçbir şey söyleme.
+8. Sadece mesaj metnini yaz; tırnak, sahne tarifi, parantez içi açıklama veya isim etiketi ekleme.`;
 }
 
 export function calculateTypingDelay(responseText: string): number {

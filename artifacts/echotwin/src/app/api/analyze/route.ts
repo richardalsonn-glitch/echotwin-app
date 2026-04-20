@@ -75,8 +75,9 @@ export async function POST(request: NextRequest) {
     let completion;
     try {
       completion = await openai.chat.completions.create({
-        model: process.env.AI_ANALYSIS_MODEL ?? "gpt-5.2",
+        model: process.env.AI_ANALYSIS_MODEL ?? "openai/gpt-oss-120b:free",
         max_completion_tokens: 2048,
+        temperature: 0.2,
         messages: [
           {
             role: "system",
