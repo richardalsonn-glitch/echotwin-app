@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, use, useCallback } from "react";
+import { useState, useEffect, useRef, use, useCallback, useLayoutEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { Persona, ChatMessage } from "@/types/persona";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -227,7 +227,7 @@ export default function ChatPage({
 }) {
   const { personaId } = use(params);
   const router = useRouter();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const presenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -266,13 +266,54 @@ export default function ChatPage({
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* ── Scroll ── */
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+
+    viewport.scrollTo({
+      top: viewport.scrollHeight,
+      behavior,
+    });
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingContent, isTyping, scrollToBottom]);
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (messages.length === 0 && !streamingContent && !isTyping) {
+        viewport.scrollTop = 0;
+        return;
+      }
+
+      scrollToBottom("auto");
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages.length, streamingContent, isTyping, voiceStatus, scrollToBottom]);
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousHtmlOverscroll = html.style.overscrollBehaviorY;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehaviorY;
+
+    html.style.overflow = "hidden";
+    html.style.overscrollBehaviorY = "none";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehaviorY = "none";
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      html.style.overscrollBehaviorY = previousHtmlOverscroll;
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehaviorY = previousBodyOverscroll;
+    };
+  }, []);
 
   /* ── Presence helpers ── */
   function clearPresenceTimer() {
@@ -1350,13 +1391,18 @@ export default function ChatPage({
 
   return (
     <div
-      className="max-w-md mx-auto flex min-h-[100svh] h-[100dvh] flex-col overflow-hidden"
-      style={{ background: "#0B1220", minHeight: "100svh", height: "100dvh" }}
+      className="fixed inset-0 mx-auto flex w-full max-w-md flex-col overflow-hidden"
+      style={{
+        background: "#0B1220",
+        minHeight: "100svh",
+        height: "100dvh",
+        maxHeight: "100dvh",
+      }}
     >
 
       {/* ── Header ── */}
       <div
-        className="sticky top-0 z-10 flex shrink-0 items-center gap-3 px-3 pb-2.5"
+        className="relative z-10 flex shrink-0 items-center gap-3 px-3 pb-2.5"
         style={{
           paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.625rem)",
           background: "rgba(10,17,33,0.92)",
@@ -1418,9 +1464,12 @@ export default function ChatPage({
 
       {/* ── Messages ── */}
       <div
+        ref={messagesViewportRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-4 pb-2"
         style={{
           backgroundImage: "radial-gradient(ellipse 70% 40% at 50% 0%, rgba(20,184,166,0.04) 0%, transparent 60%)",
+          overflowAnchor: "none",
+          WebkitOverflowScrolling: "touch",
         }}
       >
 
@@ -1661,8 +1710,7 @@ export default function ChatPage({
             </motion.div>
           )}
         </AnimatePresence>
-
-        <div ref={messagesEndRef} className="h-2" />
+        <div className="h-2" aria-hidden="true" />
       </div>
 
       {/* ── Paywall ── */}
