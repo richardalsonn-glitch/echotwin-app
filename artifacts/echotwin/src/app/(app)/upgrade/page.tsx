@@ -2,377 +2,372 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
+  BarChart3,
   Check,
   Crown,
-  Zap,
   Infinity as InfinityIcon,
+  Lock,
   MessageCircle,
+  Mic,
+  Sparkles,
   Trash2,
   UserPlus,
-  BarChart3,
-  Mic,
-  Download,
-  Phone,
-  Camera,
-  Lock,
+  Zap,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { TIER_PRICES } from "@/lib/subscription/limits";
 
-/* ─── Plan data ─────────────────────────────────────────── */
+type BillingCycle = "monthly" | "yearly";
+type PaidTier = "basic" | "full";
+type SelectableTier = "free" | PaidTier;
 
-const FREE_FEATURES = [
-  { icon: MessageCircle, label: "1 profil oluşturma" },
-  { icon: MessageCircle, label: "5 mesaj hakkı" },
-  { icon: Check, label: "Profil fotoğrafı yükleme" },
-];
+type PlanFeature = {
+  icon: LucideIcon;
+  label: string;
+  locked?: boolean;
+};
 
-const FREE_LOCKED = [
-  { icon: Trash2, label: "Sohbet silme" },
-  { icon: UserPlus, label: "Yeni kişi ekleme" },
-  { icon: BarChart3, label: "İlişki analizi" },
-  { icon: Mic, label: "Ses analizi" },
-];
+type PlanCard = {
+  tier: SelectableTier;
+  name: string;
+  description: string;
+  icon: LucideIcon;
+  price: number;
+  suffix: string;
+  features: PlanFeature[];
+  cta: string;
+  badge?: string;
+  featured?: boolean;
+  footnote?: string;
+};
 
-const BASIC_FEATURES = [
-  { icon: UserPlus, label: "2 profil oluşturma" },
-  { icon: MessageCircle, label: "Aylık 100 mesaj hakkı" },
-  { icon: Check, label: "Profil fotoğrafı yükleme" },
-  { icon: Check, label: "Profil adı düzenleme" },
-  { icon: Trash2, label: "Sohbet silme" },
-  { icon: BarChart3, label: "İlişki analizi" },
-];
+const PLAN_ORDER: SelectableTier[] = ["free", "basic", "full"];
 
-const FULL_FEATURES = [
-  { icon: InfinityIcon, label: "Sınırsız profil" },
-  { icon: InfinityIcon, label: "Sınırsız mesaj" },
-  { icon: Zap, label: "Daha gelişmiş AI yanıtlar (GPT-5.2)" },
-  { icon: BarChart3, label: "İlişki analizi" },
-  { icon: Mic, label: "Ses tonu analizi" },
-  { icon: MessageCircle, label: "Sesli mesajlaşma" },
-  { icon: Download, label: "Sohbet export & yedekleme" },
-  { icon: Check, label: "Tema / arka plan değiştirme" },
-];
-
-const COMING_SOON = [
-  { icon: Phone, label: "Sesli arama" },
-  { icon: Camera, label: "Fotoğraf paylaşımı" },
-];
-
-/* ─── Component ─────────────────────────────────────────── */
+function formatPrice(price: number): string {
+  if (price === 0) return "₺0";
+  return `₺${new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(price)}`;
+}
 
 export default function UpgradePage() {
-  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
+  const [billing, setBilling] = useState<BillingCycle>("monthly");
+  const [selectedTier, setSelectedTier] = useState<SelectableTier>("full");
 
   const basicPrice =
     billing === "monthly" ? TIER_PRICES.basic.monthly : TIER_PRICES.basic.yearly;
   const fullPrice =
     billing === "monthly" ? TIER_PRICES.full.monthly : TIER_PRICES.full.yearly;
 
-  function handleSubscribe(tier: "basic" | "full") {
+  const plans: PlanCard[] = [
+    {
+      tier: "free",
+      name: "Ücretsiz",
+      description: "Deneyimi keşfetmek için kısa başlangıç.",
+      icon: MessageCircle,
+      price: 0,
+      suffix: "/ ay",
+      cta: "Mevcut Plan",
+      features: [
+        { icon: MessageCircle, label: "1 profil oluşturma" },
+        { icon: MessageCircle, label: "5 mesaj hakkı" },
+        { icon: Check, label: "Profil fotoğrafı yükleme" },
+        { icon: Lock, label: "Ses özellikleri kapalı", locked: true },
+      ],
+    },
+    {
+      tier: "basic",
+      name: "Temel",
+      description: "Düzenli sohbet ve temel analiz için.",
+      icon: Zap,
+      price: basicPrice,
+      suffix: "/ ay",
+      cta: "Temel'e Geç",
+      footnote:
+        billing === "yearly"
+          ? `Yıllık ${formatPrice(basicPrice * 12)}`
+          : "Aylık kullanım",
+      features: [
+        { icon: UserPlus, label: "2 profil oluşturma" },
+        { icon: MessageCircle, label: "Aylık 100 mesaj" },
+        { icon: Trash2, label: "Sohbet silme" },
+        { icon: BarChart3, label: "İlişki analizi" },
+      ],
+    },
+    {
+      tier: "full",
+      name: "Full",
+      description: "Ses, medya ve sınırsız kullanım isteyenler için.",
+      icon: Crown,
+      price: fullPrice,
+      suffix: "/ ay",
+      cta: "Full'a Geç",
+      badge: "En Çok Tercih Edilen",
+      featured: true,
+      footnote:
+        billing === "yearly"
+          ? `Yıllık ${formatPrice(fullPrice * 12)}`
+          : `Yıllıkta ${formatPrice(TIER_PRICES.full.yearly)} / ay`,
+      features: [
+        { icon: InfinityIcon, label: "Sınırsız profil ve mesaj" },
+        { icon: Sparkles, label: "Gelişmiş AI yanıtları" },
+        { icon: Mic, label: "Ses profili ve sesli mesaj" },
+        { icon: BarChart3, label: "Gelişmiş analiz" },
+        { icon: Check, label: "Export ve yedekleme" },
+      ],
+    },
+  ];
+
+  function handleSubscribe(tier: PaidTier) {
     alert(
       `${tier === "basic" ? "Temel" : "Full"} plan aboneliği yakında aktif olacak! Şimdilik ücretsiz devam edebilirsin.`
     );
   }
 
+  function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>, tier: SelectableTier) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    setSelectedTier(tier);
+  }
+
+  function handleCtaClick(tier: SelectableTier) {
+    setSelectedTier(tier);
+    if (tier === "basic" || tier === "full") handleSubscribe(tier);
+  }
+
   return (
-    <div
-      className="max-w-md mx-auto min-h-screen flex flex-col"
-      style={{ background: "#0B1220" }}
-    >
-      {/* ── Header ── */}
-      <div
-        className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3"
-        style={{
-          background: "rgba(10,17,33,0.92)",
-          backdropFilter: "blur(20px)",
-          borderBottom: "1px solid rgba(255,255,255,0.055)",
-        }}
+    <div className="min-h-[100svh] bg-[#0B1220] text-white">
+      <header
+        className="sticky top-0 z-20 border-b border-white/6 bg-[#0a1121]/90 backdrop-blur-2xl"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
-        <Link href="/home">
-          <button className="h-9 w-9 rounded-full flex items-center justify-center hover:bg-white/8 transition-colors">
-            <ArrowLeft className="h-5 w-5 text-white/70" />
-          </button>
-        </Link>
-        <div>
-          <h1 className="font-bold text-[15px] text-white/90">Premium Planlar</h1>
-          <p className="text-[11.5px] text-white/40">Daha fazla konuş, daha gerçek hisset</p>
-        </div>
-      </div>
-
-      <div className="flex-1 px-4 py-7 space-y-5">
-
-        {/* ── Hero ── */}
-        <div className="text-center mb-2">
-          <div
-            className="inline-flex items-center justify-center h-16 w-16 rounded-2xl mb-4"
-            style={{
-              background: "rgba(20,184,166,0.12)",
-              border: "1px solid rgba(20,184,166,0.25)",
-              boxShadow: "0 0 32px rgba(20,184,166,0.18)",
-            }}
-          >
-            <Crown className="h-8 w-8 text-primary" />
-          </div>
-          <h2 className="text-[26px] font-bold tracking-tight gradient-text">
-            Bendeki Sen Premium
-          </h2>
-          <p className="text-white/45 text-[13.5px] mt-2 leading-relaxed">
-            Sınırsız konuş, sanki hep yanındaymış gibi
-          </p>
-        </div>
-
-        {/* ── Billing toggle ── */}
-        <div
-          className="flex items-center rounded-2xl p-1 gap-1"
-          style={{ background: "rgba(255,255,255,0.05)" }}
-        >
-          {(["monthly", "yearly"] as const).map((b) => (
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+          <Link href="/home">
             <button
-              key={b}
-              onClick={() => setBilling(b)}
-              className="flex-1 py-2 rounded-xl text-[13px] font-medium transition-all"
-              style={
-                billing === b
-                  ? {
-                      background: "rgba(20,184,166,0.18)",
-                      color: "rgba(255,255,255,0.92)",
-                      boxShadow: "0 1px 6px rgba(0,0,0,0.2)",
-                    }
-                  : { color: "rgba(255,255,255,0.40)" }
-              }
+              type="button"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/70 transition-colors hover:border-primary/30 hover:text-primary"
+              aria-label="Geri dön"
             >
-              {b === "monthly" ? "Aylık" : "Yıllık"}
-              {b === "yearly" && (
-                <span
-                  className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                  style={{ background: "rgba(20,184,166,0.25)", color: "rgba(20,184,166,0.9)" }}
-                >
-                  %10 indirim
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          </Link>
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-bold text-white/92">Üyelik Paketleri</h1>
+            <p className="truncate text-[11.5px] text-white/42">
+              Paketleri karşılaştır, sana uygun deneyimi seç
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+        <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/18 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary">
+              <Crown className="h-3.5 w-3.5" />
+              Bendeki Sen Premium
+            </div>
+            <h2 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[36px]">
+              Daha fazla konuş, daha gerçek hisset.
+            </h2>
+            <p className="mt-2 max-w-lg text-[13.5px] leading-relaxed text-white/48">
+              Tüm paketleri tek yerde karşılaştır. Seçtiğin kart öne çıkar, CTA
+              butonu da ona göre belirginleşir.
+            </p>
+          </div>
+
+          <div className="w-full rounded-2xl border border-white/8 bg-white/[0.045] p-1 md:w-[320px]">
+            {(["monthly", "yearly"] as const).map((cycle) => (
+              <button
+                key={cycle}
+                type="button"
+                onClick={() => setBilling(cycle)}
+                className={`relative h-10 w-1/2 rounded-xl text-[13px] font-semibold transition-all ${
+                  billing === cycle ? "text-white" : "text-white/40 hover:text-white/65"
+                }`}
+              >
+                {billing === cycle && (
+                  <motion.span
+                    layoutId="billing-active"
+                    className="absolute inset-0 rounded-xl border border-primary/25 bg-primary/16 shadow-[0_0_20px_rgba(20,184,166,0.18)]"
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                  />
+                )}
+                <span className="relative">
+                  {cycle === "monthly" ? "Aylık" : "Yıllık"}
+                  {cycle === "yearly" && (
+                    <span className="ml-1.5 rounded-full bg-primary/18 px-1.5 py-0.5 text-[10px] text-primary">
+                      %10
+                    </span>
+                  )}
                 </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Free Plan ── */}
-        <div
-          className="rounded-2xl p-5"
-          style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.07)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <span className="font-semibold text-[15px] text-white/80">Ücretsiz</span>
-            <span
-              className="text-[11px] px-2.5 py-1 rounded-full"
-              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.40)" }}
-            >
-              Mevcut Plan
-            </span>
-          </div>
-          <p className="text-[32px] font-bold text-white/90 mb-4">
-            ₺0
-            <span className="text-[15px] font-normal text-white/35 ml-1">/ay</span>
-          </p>
-          <div className="space-y-2.5">
-            {FREE_FEATURES.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-2.5">
-                <Icon className="h-3.5 w-3.5 text-white/30 shrink-0" />
-                <span className="text-[13px] text-white/55">{label}</span>
-              </div>
-            ))}
-            {FREE_LOCKED.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-2.5 opacity-40">
-                <Lock className="h-3.5 w-3.5 text-white/30 shrink-0" />
-                <span className="text-[13px] text-white/40 line-through">{label}</span>
-              </div>
+              </button>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* ── Basic Plan ── */}
-        <div
-          className="rounded-2xl p-5 relative overflow-hidden"
-          style={{
-            background: "rgba(14,22,40,0.90)",
-            border: "1px solid rgba(20,184,166,0.20)",
-          }}
-        >
-          <div
-            className="absolute top-0 left-0 right-0 h-[1px]"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(20,184,166,0.4), transparent)" }}
-          />
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary/80" />
-              <span className="font-bold text-[15px] text-white/90">Temel</span>
-            </div>
-          </div>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`basic-${billing}`}
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
-              transition={{ duration: 0.15 }}
-            >
-              <p className="text-[32px] font-bold text-white/90 mb-0.5">
-                ₺{basicPrice.toFixed(2)}
-                <span className="text-[15px] font-normal text-white/35 ml-1">/ay</span>
-              </p>
-              {billing === "yearly" && (
-                <p className="text-[12px] text-primary/70 mb-1">
-                  Yıllık faturalandırılır · ₺{(basicPrice * 12).toFixed(2)}/yıl
-                </p>
-              )}
-            </motion.div>
-          </AnimatePresence>
-          <div className="space-y-2.5 mt-4 mb-5">
-            {BASIC_FEATURES.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-2.5">
-                <Icon className="h-3.5 w-3.5 text-primary/70 shrink-0" />
-                <span className="text-[13px] text-white/75">{label}</span>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={() => handleSubscribe("basic")}
-            className="w-full h-11 rounded-2xl text-[13.5px] font-semibold transition-all active:scale-[0.98]"
-            style={{
-              background: "rgba(20,184,166,0.10)",
-              border: "1px solid rgba(20,184,166,0.30)",
-              color: "rgba(20,184,166,0.9)",
-            }}
-          >
-            Temel&apos;e Geç
-          </button>
-        </div>
+        <section className="-mx-4 overflow-x-auto px-4 pb-4 pt-2 [scrollbar-width:none] sm:mx-0 sm:px-0">
+          <div className="flex min-w-max snap-x snap-mandatory gap-3 sm:grid sm:min-w-0 sm:grid-cols-3 sm:gap-4 lg:gap-5">
+            {plans.map((plan) => {
+              const Icon = plan.icon;
+              const isSelected = selectedTier === plan.tier;
+              const isPaid = plan.tier === "basic" || plan.tier === "full";
 
-        {/* ── Full Plan — "En Popüler" glow card ── */}
-        <div
-          className="rounded-2xl relative overflow-hidden"
-          style={{
-            background: "linear-gradient(145deg, rgba(12,36,44,0.95) 0%, rgba(8,24,36,0.98) 100%)",
-            border: "1px solid rgba(20,184,166,0.35)",
-            boxShadow: "0 0 40px rgba(20,184,166,0.15), 0 4px 24px rgba(0,0,0,0.4)",
-          }}
-        >
-          {/* Glow orb */}
-          <div
-            className="absolute -top-16 -right-16 h-48 w-48 rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 70%)" }}
-          />
-          <div
-            className="absolute top-0 left-0 right-0 h-[1.5px]"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(20,184,166,0.7), rgba(14,165,233,0.6), rgba(20,184,166,0.7), transparent)" }}
-          />
-
-          <div className="relative p-5">
-            {/* Badge */}
-            <div className="absolute top-4 right-4">
-              <div
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
-                style={{
-                  background: "linear-gradient(135deg, rgba(20,184,166,0.25), rgba(14,165,233,0.20))",
-                  border: "1px solid rgba(20,184,166,0.40)",
-                  color: "#2dd4bf",
-                }}
-              >
-                <Zap className="h-3 w-3" />
-                En Popüler
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 mb-4">
-              <Crown className="h-5 w-5 text-primary" />
-              <span className="font-bold text-[16px] gradient-text">Full</span>
-            </div>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`full-${billing}`}
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 6 }}
-                transition={{ duration: 0.15 }}
-              >
-                <p className="text-[38px] font-bold text-white mb-0.5 leading-none">
-                  ₺{fullPrice.toFixed(2)}
-                  <span className="text-[16px] font-normal text-white/35 ml-1">/ay</span>
-                </p>
-                {billing === "yearly" && (
-                  <p className="text-[12px] text-primary/70 mb-1">
-                    Yıllık faturalandırılır · ₺{(fullPrice * 12).toFixed(2)}/yıl
-                  </p>
-                )}
-                {billing === "monthly" && (
-                  <p className="text-[12px] text-white/30 mb-1">
-                    veya yıllık alırsan ₺{TIER_PRICES.full.yearly.toFixed(2)}/ay
-                  </p>
-                )}
-              </motion.div>
-            </AnimatePresence>
-
-            <div className="space-y-2.5 mt-4 mb-6">
-              {FULL_FEATURES.map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2.5">
-                  <Icon className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span className="text-[13px] text-white/85">{label}</span>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => handleSubscribe("full")}
-              className="w-full h-12 rounded-2xl text-[14px] font-bold text-white transition-all active:scale-[0.98]"
-              style={{
-                background: "linear-gradient(135deg, hsl(183 82% 34%), hsl(198 80% 41%))",
-                boxShadow: "0 4px 20px rgba(20,184,166,0.40)",
-              }}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <Crown className="h-4 w-4" />
-                Full&apos;a Geç
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* ── Coming Soon ── */}
-        <div
-          className="rounded-2xl p-5"
-          style={{
-            background: "rgba(255,255,255,0.025)",
-            border: "1px solid rgba(255,255,255,0.06)",
-          }}
-        >
-          <p className="text-[12px] font-semibold text-white/40 uppercase tracking-widest mb-3">
-            Yakında
-          </p>
-          <div className="space-y-2.5">
-            {COMING_SOON.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-2.5">
-                <Icon className="h-3.5 w-3.5 text-white/25 shrink-0" />
-                <span className="text-[13px] text-white/40">{label}</span>
-                <span
-                  className="ml-auto text-[10px] px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.30)" }}
+              return (
+                <motion.article
+                  key={plan.tier}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedTier(plan.tier)}
+                  onKeyDown={(event) => handleCardKeyDown(event, plan.tier)}
+                  className={`relative flex h-[410px] w-[78vw] max-w-[300px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[26px] border p-4 outline-none transition-colors sm:h-[438px] sm:w-auto sm:max-w-none ${
+                    isSelected
+                      ? "border-primary/70 bg-[#0f2530] shadow-[0_0_34px_rgba(20,184,166,0.22)]"
+                      : "border-white/8 bg-[#0e1728] shadow-[0_18px_44px_rgba(0,0,0,0.28)] hover:border-primary/30"
+                  } ${plan.featured ? "sm:-translate-y-2" : ""}`}
+                  style={{
+                    background: plan.featured
+                      ? "linear-gradient(150deg, rgba(12,42,50,0.98), rgba(8,20,34,0.98) 58%, rgba(11,18,32,0.98))"
+                      : "linear-gradient(150deg, rgba(16,27,46,0.98), rgba(9,16,30,0.98))",
+                  }}
+                  animate={{
+                    scale: isSelected ? 1.05 : 1,
+                    y: plan.featured ? -6 : 0,
+                  }}
+                  whileHover={{
+                    scale: isSelected ? 1.05 : 1.02,
+                    y: plan.featured ? -10 : -4,
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 360, damping: 28 }}
                 >
-                  Yakında
+                  <div
+                    className="pointer-events-none absolute inset-x-0 top-0 h-px"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, transparent, rgba(20,184,166,0.62), transparent)",
+                    }}
+                  />
+                  {isSelected && (
+                    <div className="pointer-events-none absolute inset-0 rounded-[26px] ring-1 ring-inset ring-primary/40" />
+                  )}
+
+                  {plan.badge && (
+                    <div className="absolute right-3 top-3 rounded-full border border-primary/30 bg-primary/16 px-2.5 py-1 text-[10.5px] font-bold text-primary shadow-[0_0_18px_rgba(20,184,166,0.18)]">
+                      {plan.badge}
+                    </div>
+                  )}
+
+                  <div className="mb-4 flex items-start gap-3 pr-20">
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${
+                        isSelected
+                          ? "border-primary/35 bg-primary/16 text-primary"
+                          : "border-white/10 bg-white/[0.05] text-white/58"
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-[18px] font-bold text-white">{plan.name}</h3>
+                      <p className="mt-1 text-[12px] leading-relaxed text-white/45">
+                        {plan.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={`${plan.tier}-${billing}`}
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      transition={{ duration: 0.14 }}
+                      className="mb-4"
+                    >
+                      <p className="flex items-baseline gap-1.5">
+                        <span className="text-[34px] font-black leading-none tracking-tight text-white">
+                          {formatPrice(plan.price)}
+                        </span>
+                        <span className="text-[13px] font-medium text-white/38">{plan.suffix}</span>
+                      </p>
+                      <p className="mt-1 h-4 text-[11.5px] font-medium text-primary/70">
+                        {plan.footnote ?? "Başlangıç paketi"}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+
+                  <div className="mb-4 space-y-2.5">
+                    {plan.features.map(({ icon: FeatureIcon, label, locked }) => (
+                      <div
+                        key={label}
+                        className={`flex items-start gap-2.5 text-[12.5px] leading-snug ${
+                          locked ? "text-white/35" : "text-white/76"
+                        }`}
+                      >
+                        <FeatureIcon
+                          className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
+                            locked ? "text-white/28" : "text-primary/82"
+                          }`}
+                        />
+                        <span>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-auto">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleCtaClick(plan.tier);
+                      }}
+                      className={`flex h-11 w-full items-center justify-center gap-2 rounded-2xl text-[13.5px] font-bold transition-all active:scale-[0.98] ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-[0_0_24px_rgba(20,184,166,0.32)]"
+                          : "border border-white/10 bg-white/[0.055] text-white/62 hover:border-primary/25 hover:text-primary"
+                      }`}
+                    >
+                      {isPaid && plan.tier === "full" ? <Crown className="h-4 w-4" /> : null}
+                      {isPaid && plan.tier === "basic" ? <Zap className="h-4 w-4" /> : null}
+                      {!isPaid ? <Check className="h-4 w-4" /> : null}
+                      {plan.cta}
+                    </button>
+                  </div>
+                </motion.article>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="grid gap-3 rounded-3xl border border-white/8 bg-white/[0.035] p-3 text-[12px] text-white/45 sm:grid-cols-3">
+          {PLAN_ORDER.map((tier) => {
+            const plan = plans.find((item) => item.tier === tier);
+            return (
+              <div key={tier} className="flex items-center gap-2 rounded-2xl bg-white/[0.025] px-3 py-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    selectedTier === tier ? "bg-primary shadow-[0_0_12px_rgba(20,184,166,0.7)]" : "bg-white/20"
+                  }`}
+                />
+                <span className="truncate">
+                  {plan?.name}: {plan ? formatPrice(plan.price) : ""}
                 </span>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
-        <p className="text-center text-[12px] text-white/25 pb-6 leading-relaxed">
-          İstediğin zaman iptal edebilirsin.{"\n"}Güvenli ödeme · Türkiye&apos;de hizmet.
+        <p className="pb-6 text-center text-[12px] leading-relaxed text-white/28">
+          İstediğin zaman iptal edebilirsin. Güvenli ödeme altyapısı aktif olduğunda
+          seçtiğin paketle devam edebilirsin.
         </p>
-      </div>
+      </main>
     </div>
   );
 }
