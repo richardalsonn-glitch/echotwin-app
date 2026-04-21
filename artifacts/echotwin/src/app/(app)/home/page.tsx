@@ -5,16 +5,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Persona } from "@/types/persona";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AppMenu } from "@/components/app/app-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,16 +28,12 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
-  Menu,
   MoreVertical,
   Trash2,
   User,
-  LogOut,
   Crown,
   Sparkles,
   Bell,
-  BellOff,
-  Upload,
   MessageCircle,
   ChevronRight,
 } from "lucide-react";
@@ -48,8 +43,6 @@ import {
   getUnreadCount,
   getLastMessage,
   setLastMessage,
-  isSoundEnabled,
-  setSoundEnabled,
   requestNotificationPermission,
   type LastMessage,
 } from "@/lib/notifications";
@@ -109,7 +102,6 @@ export default function HomePage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [soundOn, setSoundOn] = useState(true);
   const [lastMessages, setLastMessages] = useState<Record<string, LastMessage>>({});
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [userName, setUserName] = useState("");
@@ -188,7 +180,6 @@ export default function HomePage() {
 
   useEffect(() => {
     setGreeting(getGreeting());
-    setSoundOn(isSoundEnabled());
     void loadPersonas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -204,13 +195,6 @@ export default function HomePage() {
     return () => window.removeEventListener("focus", onFocus);
   }, [syncLocalData]);
 
-  function toggleSound() {
-    const next = !soundOn;
-    setSoundOn(next);
-    setSoundEnabled(next);
-    toast.success(next ? "Ses açık" : "Ses kapalı");
-  }
-
   async function handleEnableNotifications() {
     const granted = await requestNotificationPermission();
     toast.success(granted ? "Bildirimler açıldı" : "İzin verilmedi");
@@ -225,13 +209,6 @@ export default function HomePage() {
       toast.error("Silinemedi");
     }
     setDeleteId(null);
-  }
-
-  async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
   }
 
   /* ── Sorted + stats ── */
@@ -251,43 +228,9 @@ export default function HomePage() {
 
       {/* ── Sticky top bar ── */}
       <div className="sticky top-0 z-20 px-5 py-3.5 flex items-center justify-between bg-transparent backdrop-blur-2xl border-b border-white/4">
+        <AppMenu initialAuthenticated />
         <span className="text-[13px] font-semibold gradient-text tracking-wide">Bendeki Sen</span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="h-9 rounded-full px-3 flex items-center gap-2 border border-white/8 bg-white/5 hover:bg-white/10 transition-colors text-xs font-semibold text-foreground/80"
-              aria-label="Menüyü aç"
-              type="button"
-            >
-              <Menu className="h-3.5 w-3.5 text-primary" />
-              Menü
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-card border-border/60 rounded-2xl shadow-2xl w-52 p-1">
-            <DropdownMenuItem onClick={() => router.push("/onboarding/upload")} className="rounded-xl gap-2.5 text-sm py-2.5">
-              <Plus className="h-4 w-4 text-primary" />
-              Yeni Kişi Ekle
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push("/upgrade")} className="rounded-xl gap-2.5 text-sm py-2.5">
-              <Crown className="h-4 w-4 text-amber-400" />
-              Üyelik / Planlar
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-border/40 my-1" />
-            <DropdownMenuItem onClick={toggleSound} className="rounded-xl gap-2.5 text-sm py-2.5">
-              {soundOn ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4" />}
-              {soundOn ? "Ses Açık" : "Ses Kapalı"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleEnableNotifications} className="rounded-xl gap-2.5 text-sm py-2.5">
-              <Bell className="h-4 w-4 text-muted-foreground" />
-              Bildirimlere İzin Ver
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-border/40 my-1" />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive rounded-xl gap-2.5 text-sm py-2.5">
-              <LogOut className="h-4 w-4" />
-              Çıkış Yap
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="h-9 w-9" aria-hidden="true" />
       </div>
 
       {/* ── Scrollable content ── */}
@@ -346,54 +289,6 @@ export default function HomePage() {
               )}
             </motion.div>
           )}
-        </div>
-
-        {/* ── Upload CTA card — shown always at top ── */}
-        <div className="px-5 mb-5">
-          <Link href="/onboarding/upload">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-              whileTap={{ scale: 0.98 }}
-              className="relative overflow-hidden rounded-3xl p-5 cursor-pointer"
-              style={{
-                background: "linear-gradient(135deg, hsl(183,82%,12%) 0%, hsl(220,50%,10%) 100%)",
-                border: "1px solid hsl(183,82%,46%,0.25)",
-                boxShadow: "0 0 40px hsl(183,82%,46%,0.08), inset 0 1px 0 hsl(183,82%,46%,0.12)",
-              }}
-            >
-              {/* Background glow orb */}
-              <div
-                className="pointer-events-none absolute right-0 top-0 h-32 w-32 opacity-30"
-                style={{ background: "radial-gradient(circle, hsl(183,82%,46%) 0%, transparent 70%)" }}
-              />
-
-              <div className="flex items-center gap-4">
-                <div
-                  className="h-12 w-12 rounded-2xl flex items-center justify-center shrink-0"
-                  style={{
-                    background: "hsl(183,82%,46%,0.15)",
-                    border: "1px solid hsl(183,82%,46%,0.30)",
-                    boxShadow: "0 0 20px hsl(183,82%,46%,0.2)",
-                  }}
-                >
-                  <Upload className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[15px] text-foreground leading-tight">
-                    Yeni Sohbet Yükle
-                  </p>
-                  <p className="text-[12.5px] text-muted-foreground/70 mt-0.5">
-                    WhatsApp&apos;tan .txt dışa aktarımı
-                  </p>
-                </div>
-                <div className="shrink-0 h-8 w-8 rounded-full bg-primary/15 border border-primary/25 flex items-center justify-center">
-                  <ChevronRight className="h-4 w-4 text-primary" />
-                </div>
-              </div>
-            </motion.div>
-          </Link>
         </div>
 
         {/* ── Quick actions ── */}
@@ -703,21 +598,23 @@ export default function HomePage() {
       </div>
 
       {/* ── FAB ── */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
-        <Link href="/onboarding/upload">
-          <motion.button
-            whileTap={{ scale: 0.94 }}
-            className="flex items-center gap-2.5 px-6 h-13 rounded-2xl font-semibold text-[13.5px] text-primary-foreground transition-all shadow-2xl"
-            style={{
-              background: "linear-gradient(135deg, hsl(183,82%,40%) 0%, hsl(183,72%,34%) 100%)",
-              boxShadow: "0 8px 32px hsl(183,82%,46%,0.35), 0 2px 8px hsl(183,82%,46%,0.20)",
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Yeni Kişi Ekle
-          </motion.button>
-        </Link>
-      </div>
+      {!loading && sorted.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-10 -translate-x-1/2">
+          <Link href="/onboarding/upload">
+            <motion.button
+              whileTap={{ scale: 0.94 }}
+              className="flex h-13 items-center gap-2.5 rounded-2xl px-6 text-[13.5px] font-semibold text-primary-foreground shadow-2xl transition-all"
+              style={{
+                background: "linear-gradient(135deg, hsl(183,82%,40%) 0%, hsl(183,72%,34%) 100%)",
+                boxShadow: "0 8px 32px hsl(183,82%,46%,0.35), 0 2px 8px hsl(183,82%,46%,0.20)",
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Yeni Kişi Ekle
+            </motion.button>
+          </Link>
+        </div>
+      )}
 
       {/* ── Delete Dialog ── */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
