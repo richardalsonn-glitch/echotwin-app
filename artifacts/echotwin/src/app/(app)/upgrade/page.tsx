@@ -42,9 +42,9 @@ type PlanCard = {
   badge?: string;
   featured?: boolean;
   footnote?: string;
+  iconTone: string;
+  iconPanel: string;
 };
-
-const PLAN_ORDER: SelectableTier[] = ["free", "basic", "full"];
 
 function formatPrice(price: number): string {
   if (price === 0) return "₺0";
@@ -52,6 +52,13 @@ function formatPrice(price: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(price)}`;
+}
+
+function getFeatureIconTone(tier: SelectableTier, locked?: boolean): string {
+  if (locked) return "text-white/28";
+  if (tier === "free") return "text-white/62";
+  if (tier === "basic") return "text-yellow-300/82";
+  return "text-amber-300/90";
 }
 
 export default function UpgradePage() {
@@ -67,57 +74,67 @@ export default function UpgradePage() {
     {
       tier: "free",
       name: "Ücretsiz",
-      description: "Deneyimi keşfetmek için kısa başlangıç.",
+      description: "Deneyimi keşfetmek için ideal başlangıç.",
       icon: MessageCircle,
       price: 0,
       suffix: "/ ay",
       cta: "Mevcut Plan",
+      footnote: "Başlangıç paketi",
+      iconTone: "text-white/92",
+      iconPanel: "border-white/14 bg-white/[0.08]",
       features: [
         { icon: MessageCircle, label: "1 profil oluşturma" },
         { icon: MessageCircle, label: "5 mesaj hakkı" },
         { icon: Check, label: "Profil fotoğrafı yükleme" },
+        { icon: Sparkles, label: "Temel persona denemesi" },
         { icon: Lock, label: "Ses özellikleri kapalı", locked: true },
+        { icon: Lock, label: "Medya özellikleri sınırlı", locked: true },
       ],
     },
     {
       tier: "basic",
       name: "Temel",
-      description: "Düzenli sohbet ve temel analiz için.",
+      description: "Düzenli sohbet ve temel analiz isteyenler için.",
       icon: Zap,
       price: basicPrice,
       suffix: "/ ay",
-      cta: "Temel'e Geç",
-      footnote:
-        billing === "yearly"
-          ? `Yıllık ${formatPrice(basicPrice * 12)}`
-          : "Aylık kullanım",
+      cta: "Temele Geç",
+      footnote: "Aylık kullanım",
+      iconTone: "text-yellow-300",
+      iconPanel: "border-yellow-300/24 bg-yellow-300/10 shadow-[0_0_18px_rgba(250,204,21,0.10)]",
       features: [
         { icon: UserPlus, label: "2 profil oluşturma" },
-        { icon: MessageCircle, label: "Aylık 100 mesaj" },
+        { icon: MessageCircle, label: "Aylık 100 mesaj hakkı" },
+        { icon: Check, label: "Profil fotoğrafı yükleme" },
+        { icon: Check, label: "Profil adı düzenleme" },
         { icon: Trash2, label: "Sohbet silme" },
-        { icon: BarChart3, label: "İlişki analizi" },
+        { icon: BarChart3, label: "Temel ilişki analizi" },
+        { icon: Lock, label: "Gelişmiş hafıza kapalı", locked: true },
+        { icon: Lock, label: "Sesli özellikler sınırlı", locked: true },
       ],
     },
     {
       tier: "full",
       name: "Full",
-      description: "Ses, medya ve sınırsız kullanım isteyenler için.",
+      description: "Ses, medya ve daha derin deneyim isteyenler için.",
       icon: Crown,
       price: fullPrice,
       suffix: "/ ay",
-      cta: "Full'a Geç",
+      cta: "Fulla Geç",
       badge: "En Çok Tercih Edilen",
       featured: true,
-      footnote:
-        billing === "yearly"
-          ? `Yıllık ${formatPrice(fullPrice * 12)}`
-          : `Yıllıkta ${formatPrice(TIER_PRICES.full.yearly)} / ay`,
+      footnote: "En güçlü deneyim",
+      iconTone: "text-amber-300",
+      iconPanel: "border-amber-300/28 bg-amber-300/12 shadow-[0_0_20px_rgba(251,191,36,0.14)]",
       features: [
         { icon: InfinityIcon, label: "Sınırsız profil ve mesaj" },
         { icon: Sparkles, label: "Gelişmiş AI yanıtları" },
         { icon: Mic, label: "Ses profili ve sesli mesaj" },
         { icon: BarChart3, label: "Gelişmiş analiz" },
         { icon: Check, label: "Export ve yedekleme" },
+        { icon: MessageCircle, label: "Medyalı sohbet desteği" },
+        { icon: Sparkles, label: "Fotoğraf analizi ve hafıza desteği" },
+        { icon: Zap, label: "Öncelikli özellik erişimi" },
       ],
     },
   ];
@@ -164,23 +181,22 @@ export default function UpgradePage() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
-        <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <section className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="max-w-xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/18 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/18 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary">
               <Crown className="h-3.5 w-3.5" />
               Bendeki Sen Premium
             </div>
-            <h2 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[36px]">
+            <h2 className="text-[26px] font-bold leading-tight tracking-tight sm:text-[32px]">
               Daha fazla konuş, daha gerçek hisset.
             </h2>
-            <p className="mt-2 max-w-lg text-[13.5px] leading-relaxed text-white/48">
-              Tüm paketleri tek yerde karşılaştır. Seçtiğin kart öne çıkar, CTA
-              butonu da ona göre belirginleşir.
+            <p className="mt-1.5 max-w-lg text-[13px] leading-relaxed text-white/48">
+              Paketleri tek ekranda karşılaştır, ihtiyacına uygun deneyimi seç.
             </p>
           </div>
 
-          <div className="w-full rounded-2xl border border-white/8 bg-white/[0.045] p-1 md:w-[320px]">
+          <div className="w-full rounded-2xl border border-white/8 bg-white/[0.045] p-1 md:w-[300px]">
             {(["monthly", "yearly"] as const).map((cycle) => (
               <button
                 key={cycle}
@@ -210,8 +226,8 @@ export default function UpgradePage() {
           </div>
         </section>
 
-        <section className="-mx-4 overflow-x-auto px-4 pb-4 pt-2 [scrollbar-width:none] sm:mx-0 sm:px-0">
-          <div className="flex min-w-max snap-x snap-mandatory gap-3 sm:grid sm:min-w-0 sm:grid-cols-3 sm:gap-4 lg:gap-5">
+        <section className="-mx-4 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:mx-0 sm:px-0">
+          <div className="flex min-w-max snap-x snap-mandatory gap-3 sm:grid sm:min-w-0 sm:grid-cols-3 sm:gap-3 lg:gap-4">
             {plans.map((plan) => {
               const Icon = plan.icon;
               const isSelected = selectedTier === plan.tier;
@@ -225,26 +241,28 @@ export default function UpgradePage() {
                   aria-pressed={isSelected}
                   onClick={() => setSelectedTier(plan.tier)}
                   onKeyDown={(event) => handleCardKeyDown(event, plan.tier)}
-                  className={`relative flex h-[410px] w-[78vw] max-w-[300px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[26px] border p-4 outline-none transition-colors sm:h-[438px] sm:w-auto sm:max-w-none ${
+                  className={`relative flex h-[406px] w-[80vw] max-w-[292px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[412px] sm:w-auto sm:max-w-none ${
                     isSelected
-                      ? "border-primary/70 bg-[#0f2530] shadow-[0_0_34px_rgba(20,184,166,0.22)]"
-                      : "border-white/8 bg-[#0e1728] shadow-[0_18px_44px_rgba(0,0,0,0.28)] hover:border-primary/30"
-                  } ${plan.featured ? "sm:-translate-y-2" : ""}`}
+                      ? "border-primary/70 bg-[#102735] shadow-[0_0_30px_rgba(20,184,166,0.22)]"
+                      : "border-white/8 bg-[#0e1728] shadow-[0_12px_30px_rgba(0,0,0,0.22)] hover:border-primary/28"
+                  }`}
                   style={{
-                    background: plan.featured
-                      ? "linear-gradient(150deg, rgba(12,42,50,0.98), rgba(8,20,34,0.98) 58%, rgba(11,18,32,0.98))"
-                      : "linear-gradient(150deg, rgba(16,27,46,0.98), rgba(9,16,30,0.98))",
+                    background: isSelected
+                      ? "linear-gradient(150deg, rgba(17,48,58,0.98), rgba(9,24,38,0.98) 58%, rgba(11,18,32,0.98))"
+                      : plan.featured
+                      ? "linear-gradient(150deg, rgba(14,35,43,0.96), rgba(8,19,32,0.98) 62%, rgba(11,18,32,0.98))"
+                      : "linear-gradient(150deg, rgba(15,26,44,0.96), rgba(9,16,30,0.98))",
                   }}
                   animate={{
-                    scale: isSelected ? 1.05 : 1,
-                    y: plan.featured ? -6 : 0,
+                    scale: isSelected ? 1.045 : 1,
+                    opacity: isSelected ? 1 : 0.84,
                   }}
                   whileHover={{
-                    scale: isSelected ? 1.05 : 1.02,
-                    y: plan.featured ? -10 : -4,
+                    scale: isSelected ? 1.045 : 1.018,
+                    opacity: 1,
                   }}
                   whileTap={{ scale: 0.98 }}
-                  transition={{ type: "spring", stiffness: 360, damping: 28 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.65 }}
                 >
                   <div
                     className="pointer-events-none absolute inset-x-0 top-0 h-px"
@@ -254,28 +272,24 @@ export default function UpgradePage() {
                     }}
                   />
                   {isSelected && (
-                    <div className="pointer-events-none absolute inset-0 rounded-[26px] ring-1 ring-inset ring-primary/40" />
+                    <div className="pointer-events-none absolute inset-0 rounded-[24px] ring-1 ring-inset ring-primary/40" />
                   )}
 
                   {plan.badge && (
-                    <div className="absolute right-3 top-3 rounded-full border border-primary/30 bg-primary/16 px-2.5 py-1 text-[10.5px] font-bold text-primary shadow-[0_0_18px_rgba(20,184,166,0.18)]">
+                    <div className="absolute right-3 top-3 rounded-full border border-amber-300/25 bg-amber-300/12 px-2.5 py-1 text-[10px] font-bold text-amber-200 shadow-[0_0_16px_rgba(251,191,36,0.12)]">
                       {plan.badge}
                     </div>
                   )}
 
-                  <div className="mb-4 flex items-start gap-3 pr-20">
+                  <div className={`mb-3 flex items-start gap-2.5 ${plan.badge ? "pr-24" : ""}`}>
                     <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${
-                        isSelected
-                          ? "border-primary/35 bg-primary/16 text-primary"
-                          : "border-white/10 bg-white/[0.05] text-white/58"
-                      }`}
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${plan.iconPanel}`}
                     >
-                      <Icon className="h-5 w-5" />
+                      <Icon className={`h-5 w-5 ${plan.iconTone}`} />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-[18px] font-bold text-white">{plan.name}</h3>
-                      <p className="mt-1 text-[12px] leading-relaxed text-white/45">
+                      <h3 className="text-[17px] font-bold text-white">{plan.name}</h3>
+                      <p className="mt-0.5 text-[11.5px] leading-snug text-white/48">
                         {plan.description}
                       </p>
                     </div>
@@ -288,32 +302,33 @@ export default function UpgradePage() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 6 }}
                       transition={{ duration: 0.14 }}
-                      className="mb-4"
+                      className="mb-3"
                     >
                       <p className="flex items-baseline gap-1.5">
-                        <span className="text-[34px] font-black leading-none tracking-tight text-white">
+                        <span className="text-[30px] font-black leading-none tracking-tight text-white sm:text-[31px]">
                           {formatPrice(plan.price)}
                         </span>
                         <span className="text-[13px] font-medium text-white/38">{plan.suffix}</span>
                       </p>
-                      <p className="mt-1 h-4 text-[11.5px] font-medium text-primary/70">
+                      <p className="mt-1 h-4 text-[11px] font-semibold text-primary/72">
                         {plan.footnote ?? "Başlangıç paketi"}
                       </p>
                     </motion.div>
                   </AnimatePresence>
 
-                  <div className="mb-4 space-y-2.5">
+                  <div className="mb-3 space-y-1.5">
                     {plan.features.map(({ icon: FeatureIcon, label, locked }) => (
                       <div
                         key={label}
-                        className={`flex items-start gap-2.5 text-[12.5px] leading-snug ${
-                          locked ? "text-white/35" : "text-white/76"
+                        className={`flex items-start gap-2 text-[11.5px] leading-tight ${
+                          locked ? "text-white/36" : "text-white/76"
                         }`}
                       >
                         <FeatureIcon
-                          className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
-                            locked ? "text-white/28" : "text-primary/82"
-                          }`}
+                          className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${getFeatureIconTone(
+                            plan.tier,
+                            locked
+                          )}`}
                         />
                         <span>{label}</span>
                       </div>
@@ -345,25 +360,7 @@ export default function UpgradePage() {
           </div>
         </section>
 
-        <div className="grid gap-3 rounded-3xl border border-white/8 bg-white/[0.035] p-3 text-[12px] text-white/45 sm:grid-cols-3">
-          {PLAN_ORDER.map((tier) => {
-            const plan = plans.find((item) => item.tier === tier);
-            return (
-              <div key={tier} className="flex items-center gap-2 rounded-2xl bg-white/[0.025] px-3 py-2">
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    selectedTier === tier ? "bg-primary shadow-[0_0_12px_rgba(20,184,166,0.7)]" : "bg-white/20"
-                  }`}
-                />
-                <span className="truncate">
-                  {plan?.name}: {plan ? formatPrice(plan.price) : ""}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        <p className="pb-6 text-center text-[12px] leading-relaxed text-white/28">
+        <p className="pb-5 text-center text-[12px] leading-relaxed text-white/28">
           İstediğin zaman iptal edebilirsin. Güvenli ödeme altyapısı aktif olduğunda
           seçtiğin paketle devam edebilirsin.
         </p>
