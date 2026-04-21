@@ -137,11 +137,12 @@ export async function POST(request: NextRequest) {
       warnings: parseWarnings,
     });
   } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : "Yukleme hatasi";
+    const response = toUploadErrorResponse(rawMessage);
     console.error("[upload] failed", {
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: rawMessage,
     });
-    const message = error instanceof Error ? error.message : "Yukleme hatasi";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: response.message }, { status: response.status });
   }
 }
 
@@ -239,4 +240,23 @@ function createParsedData(params: {
 
 function isUploadedFile(value: FormDataEntryValue | null): value is File {
   return typeof value !== "string" && value !== null;
+}
+
+function toUploadErrorResponse(message: string): { message: string; status: number } {
+  if (message.includes("Zip icinde sohbet .txt dosyasi bulunamadi")) {
+    return {
+      message:
+        "Zip içinde sohbet .txt dosyası bulunamadı. Medyasız zip yükleyeceksen zip içinde WhatsApp sohbet .txt dosyası olmalı.",
+      status: 400,
+    };
+  }
+
+  if (message.includes("Sohbet dosyası parse edilemedi")) {
+    return { message, status: 400 };
+  }
+
+  return {
+    message: "Sohbet yüklenemedi. Lütfen dosyayı kontrol edip tekrar dene.",
+    status: 500,
+  };
 }

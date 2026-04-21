@@ -49,7 +49,7 @@ export async function extractChatUpload(file: File): Promise<ChatUploadExtractio
 async function extractZipChatUpload(file: File): Promise<ChatUploadExtraction> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const entries = Object.values(zip.files).filter((entry) => !entry.dir);
-  const textEntry = findChatTextEntry(entries);
+  const textEntry = await findChatTextEntry(entries);
 
   if (!textEntry) {
     throw new Error("Zip icinde sohbet .txt dosyasi bulunamadi");
@@ -65,20 +65,71 @@ async function extractZipChatUpload(file: File): Promise<ChatUploadExtraction> {
     chatFileName: getBaseName(textEntry.name),
     rawText: await textEntry.async("string"),
     mediaFiles,
-    warnings: mediaFiles.length === 0 ? ["Zip icinde medya dosyasi bulunamadi"] : [],
+    warnings: [],
   };
 }
 
-function findChatTextEntry(entries: JSZipObject[]): JSZipObject | null {
-  const textEntries = entries.filter((entry) => entry.name.toLowerCase().endsWith(".txt"));
-  if (textEntries.length === 0) return null;
+async function findChatTextEntry(entries: JSZipObject[]): Promise<JSZipObject | null> {
+  const visibleEntries = entries.filter((entry) => !isSystemZipEntry(entry));
+  const textEntries = visibleEntries.filter(isTextFileEntry);
+  if (textEntries.length > 0) {
+    const sortedTextEntries = [...textEntries].sort(
+      (left, right) => getChatTextEntryPriority(left) - getChatTextEntryPriority(right)
+    );
+    return sortedTextEntries[0] ?? null;
+  }
 
-  return (
-    textEntries.find((entry) => {
-      const baseName = getBaseName(entry.name).toLowerCase();
-      return baseName.includes("chat") || baseName.includes("sohbet");
-    }) ?? textEntries[0]
-  );
+  for (const entry of visibleEntries.filter(isPlainTextFallbackCandidate)) {
+    if (await looksLikeWhatsAppChatText(entry)) {
+      return entry;
+    }
+  }
+
+  return null;
+}
+
+function isTextFileEntry(entry: JSZipObject): boolean {
+  const lowerName = entry.name.trim().toLowerCase();
+  return lowerName.endsWith(".txt") || lowerName.endsWith(".text");
+}
+
+function isSystemZipEntry(entry: JSZipObject): boolean {
+  const segments = entry.name
+    .split(/[\\/]+/)
+    .map((segment) => segment.trim().toLowerCase());
+
+  return segments.some((segment) => segment === "__macosx" || segment.startsWith("._"));
+}
+
+function getChatTextEntryPriority(entry: JSZipObject): number {
+  const baseName = getBaseName(entry.name).trim().toLowerCase();
+  const fullName = entry.name.trim().toLowerCase();
+
+  if (baseName === "_chat.txt" || baseName === "chat.txt") return 0;
+  if (baseName.includes("whatsapp") && baseName.includes("chat")) return 1;
+  if (baseName.includes("sohbet") || baseName.includes("chat")) return 2;
+  if (fullName.endsWith(".txt")) return 3;
+  return 4;
+}
+
+function isPlainTextFallbackCandidate(entry: JSZipObject): boolean {
+  const baseName = getBaseName(entry.name).trim();
+  if (!baseName || baseName.includes(".")) return false;
+  return getMediaKindFromFileName(baseName) === "unknown";
+}
+
+async function looksLikeWhatsAppChatText(entry: JSZipObject): Promise<boolean> {
+  try {
+    const text = await entry.async("string");
+    const sample = text.slice(0, 8000);
+    const hasDateLine = /(?:^|\r?\n)(?:\[?\d{1,2}[./-]\d{1,2}[./-]\d{2,4}[,\]\s-]+)\d{1,2}:\d{2}/.test(
+      sample
+    );
+    const hasSenderDelimiter = /(?:^|\r?\n).{1,80}:\s+\S/.test(sample);
+    return hasDateLine && hasSenderDelimiter;
+  } catch {
+    return false;
+  }
 }
 
 function toZipMediaFile(entry: JSZipObject): ZipMediaFile | null {

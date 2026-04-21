@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { FileArchive, FileText, ArrowLeft, CheckCircle2, CloudUpload, Images } from "lucide-react";
+import { AlertCircle, FileArchive, FileText, ArrowLeft, CheckCircle2, CloudUpload, Images } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -18,19 +18,27 @@ export default function UploadPage() {
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function uploadFile(file: File) {
     const lowerName = file.name.toLowerCase();
     if (!lowerName.endsWith(".txt") && !lowerName.endsWith(".zip")) {
-      toast.error("Yalnızca .txt veya .zip dosyası kabul edilir");
+      const message = "Yalnızca .txt veya .zip dosyası kabul edilir";
+      setErrorMessage(message);
+      setUploadState("error");
+      toast.error(message);
       return;
     }
 
     if (file.size > 50 * 1024 * 1024) {
-      toast.error("Dosya boyutu 50 MB'dan büyük olamaz");
+      const message = "Dosya boyutu 50 MB'dan büyük olamaz";
+      setErrorMessage(message);
+      setUploadState("error");
+      toast.error(message);
       return;
     }
 
+    setErrorMessage(null);
     setSelectedFile(file);
     setUploadState("uploading");
     setProgress(20);
@@ -77,6 +85,7 @@ export default function UploadPage() {
       setUploadState("error");
       setProgress(0);
       const message = error instanceof Error ? error.message : "Yükleme hatası";
+      setErrorMessage(message);
       toast.error(message);
     }
   }
@@ -101,6 +110,7 @@ export default function UploadPage() {
   );
 
   const selectedIsZip = selectedFile?.name.toLowerCase().endsWith(".zip") ?? false;
+  const showDropzone = uploadState === "idle" || uploadState === "error";
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col ambient-bg">
@@ -139,7 +149,7 @@ export default function UploadPage() {
           {[
             "WhatsApp'ta kişiyle sohbeti aç",
             "Üç nokta -> Daha fazla -> Sohbeti Dışa Aktar",
-            "Medya olmadan seçersen .txt, medyayı dahil edersen .zip yükle",
+            "Medya olmadan .txt veya .zip, medyayı dahil edersen .zip yükle",
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-3">
               <span className="flex-shrink-0 h-5 w-5 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
@@ -152,7 +162,7 @@ export default function UploadPage() {
             <div className="rounded-xl bg-white/5 border border-white/8 p-3">
               <FileText className="h-4 w-4 text-primary mb-2" />
               <p className="text-xs font-semibold text-foreground/80">Medyasız</p>
-              <p className="text-[11px] text-muted-foreground/60 mt-0.5">.txt sohbet geçmişi</p>
+              <p className="text-[11px] text-muted-foreground/60 mt-0.5">.txt veya .zip sohbet geçmişi</p>
             </div>
             <div className="rounded-xl bg-white/5 border border-white/8 p-3">
               <Images className="h-4 w-4 text-primary mb-2" />
@@ -163,13 +173,13 @@ export default function UploadPage() {
         </div>
 
         <AnimatePresence mode="wait">
-          {uploadState === "idle" && (
+          {showDropzone && (
             <motion.div
-              key="idle"
+              key="dropzone"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
-              className={`relative border-2 border-dashed rounded-2xl p-12 flex flex-col items-center justify-center text-center cursor-pointer transition-all overflow-hidden ${
+              className={`relative border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all overflow-hidden ${
                 isDragging
                   ? "border-primary bg-primary/8 glow-teal"
                   : "border-border/50 hover:border-primary/40 hover:bg-card/40"
@@ -181,6 +191,15 @@ export default function UploadPage() {
             >
               {isDragging && (
                 <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
+              )}
+              {uploadState === "error" && errorMessage && (
+                <div className="mb-5 flex w-full items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-3 text-left">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Dosya okunamadı</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{errorMessage}</p>
+                  </div>
+                </div>
               )}
               <div className="h-16 w-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
                 <CloudUpload className={`h-8 w-8 transition-colors ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
