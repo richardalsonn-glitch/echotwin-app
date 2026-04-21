@@ -71,6 +71,12 @@ create table if not exists public.personas (
   avatar_url text,
   analysis jsonb,
   message_count_used integer not null default 0,
+  voice_sample_url text,
+  voice_profile_status text not null default 'none' check (voice_profile_status in ('none', 'processing', 'ready', 'failed')),
+  voice_enabled boolean not null default false,
+  voice_profile_metadata jsonb,
+  voice_message_sent boolean not null default false,
+  voice_message_sent_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -88,6 +94,10 @@ create table if not exists public.messages (
   user_id uuid references auth.users(id) on delete cascade not null,
   role text not null check (role in ('user', 'assistant')),
   content text not null,
+  message_type text not null default 'text' check (message_type in ('text', 'voice')),
+  audio_url text,
+  audio_duration_seconds integer,
+  voice_provider text,
   created_at timestamptz not null default now()
 );
 
@@ -96,6 +106,21 @@ alter table public.messages enable row level security;
 create policy "Users can manage own messages"
   on public.messages for all
   using (auth.uid() = user_id);
+
+-- 5b. Voice profile / voice message columns for existing installs
+alter table public.personas
+  add column if not exists voice_sample_url text,
+  add column if not exists voice_profile_status text not null default 'none',
+  add column if not exists voice_enabled boolean not null default false,
+  add column if not exists voice_profile_metadata jsonb,
+  add column if not exists voice_message_sent boolean not null default false,
+  add column if not exists voice_message_sent_at timestamptz;
+
+alter table public.messages
+  add column if not exists message_type text not null default 'text',
+  add column if not exists audio_url text,
+  add column if not exists audio_duration_seconds integer,
+  add column if not exists voice_provider text;
 
 -- 6. Auto-create user_profile on signup
 create or replace function public.handle_new_user()
@@ -154,6 +179,62 @@ create policy "Users can delete own avatars"
     bucket_id = 'avatars'
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
+
+-- ========================================================
+-- 8. Storage buckets for target voice samples and AI voice messages
+-- ========================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'voice-samples',
+  'voice-samples',
+  false,
+  15728640,
+  array['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/x-m4a']
+)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'voice-messages',
+  'voice-messages',
+  true,
+  10485760,
+  array['audio/mpeg', 'audio/mp3']
+)
+on conflict (id) do nothing;
+
+create policy "Users can upload own voice samples"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'voice-samples'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users can read own voice samples"
+  on storage.objects for select
+  using (
+    bucket_id = 'voice-samples'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users can update own voice samples"
+  on storage.objects for update
+  using (
+    bucket_id = 'voice-samples'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users can upload own voice messages"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'voice-messages'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Voice messages are publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'voice-messages');
 
 -- ========================================================
 -- DONE! Tabloları kontrol et:

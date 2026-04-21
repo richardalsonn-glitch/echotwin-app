@@ -1,15 +1,27 @@
 "use client";
 
-import { useState, useRef, Suspense } from "react";
+import { useState, useRef, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, Loader2, MessageCircle, Camera } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Loader2,
+  MessageCircle,
+  Camera,
+  AudioLines,
+  Upload,
+  Lock,
+} from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import type { SubscriptionTier } from "@/types/subscription";
+import { validateVoiceSampleFile } from "@/lib/voice/profile";
 
 interface ParticipantStat {
   message_count: number;
@@ -18,6 +30,8 @@ interface ParticipantStat {
   reply_ratio: number;
   short_message_ratio: number;
 }
+
+type VoiceUploadStatus = "idle" | "ready" | "uploading" | "done" | "error";
 
 function formatMessageCount(count: number): string {
   if (count >= 1000) return `${(count / 1000).toFixed(1)}B`;
@@ -47,6 +61,12 @@ function getInitials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+}
+
+function getApiError(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  const error = (value as Record<string, unknown>).error;
+  return typeof error === "string" && error.trim() ? error : null;
 }
 
 async function compressImage(file: File): Promise<Blob> {
@@ -89,6 +109,7 @@ function SelectPageContent() {
 const params = useSearchParams();
 const exportId = params?.get("export_id") ?? "";
 const fileInputRef = useRef<HTMLInputElement>(null);
+const voiceInputRef = useRef<HTMLInputElement>(null);
 
  let participants: string[] = [];
 try {
@@ -107,7 +128,39 @@ try {
   const [displayName, setDisplayName] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>("free");
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [voiceUploadStatus, setVoiceUploadStatus] = useState<VoiceUploadStatus>("idle");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSubscriptionTier() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user || cancelled) return;
+
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("subscription_tier")
+        .eq("id", user.id)
+        .single();
+
+      if (cancelled) return;
+      const tier = profile?.subscription_tier;
+      setSubscriptionTier(tier === "basic" || tier === "full" ? tier : "free");
+    }
+
+    void loadSubscriptionTier();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleSelectTarget(name: string) {
     const otherParticipant =
@@ -129,6 +182,64 @@ try {
     const url = URL.createObjectURL(file);
     setAvatarPreview(url);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleVoicePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (subscriptionTier !== "full") {
+      toast.error("Ses profili yalnizca Full planda kullanilabilir");
+      if (voiceInputRef.current) voiceInputRef.current.value = "";
+      return;
+    }
+
+    const validation = validateVoiceSampleFile(file);
+    if (!validation.ok) {
+      toast.error(validation.userMessage);
+      if (voiceInputRef.current) voiceInputRef.current.value = "";
+      return;
+    }
+
+    setVoiceFile(file);
+    setVoiceUploadStatus("ready");
+    setVoiceError(null);
+    if (voiceInputRef.current) voiceInputRef.current.value = "";
+  }
+
+  async function uploadVoiceProfile(personaId: string) {
+    if (!voiceFile || subscriptionTier !== "full") return;
+
+    setVoiceUploadStatus("uploading");
+    setVoiceError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("persona_id", personaId);
+      formData.append("audio", voiceFile);
+
+      const res = await fetch("/api/voice-profile", {
+        method: "POST",
+        body: formData,
+      });
+      const data: unknown = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(getApiError(data) ?? "Ses profili hazirlanamadi");
+      }
+
+      setVoiceUploadStatus("done");
+      toast.success("Ses profili hazirlandi");
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "Ses profili hazirlanamadi";
+      console.warn("[voice-profile] upload failed", error);
+      setVoiceUploadStatus("error");
+      setVoiceError(message);
+      toast.error(message);
+    }
   }
 
   async function handleCreate() {
@@ -189,6 +300,11 @@ try {
         }
       }
 
+      // Optional target voice sample. Failure is non-fatal for chat setup.
+      if (voiceFile && subscriptionTier === "full") {
+        await uploadVoiceProfile(personaId);
+      }
+
       router.push(`/onboarding/analyzing?persona_id=${personaId}`);
     } finally {
       setLoading(false);
@@ -196,6 +312,19 @@ try {
   }
 
   const selectedStat = selectedTarget ? stats[selectedTarget] : null;
+  const voiceUploadUnlocked = subscriptionTier === "full";
+  const voiceStatusLabel =
+    voiceUploadStatus === "uploading"
+      ? "Ses profili yukleniyor..."
+      : voiceUploadStatus === "done"
+      ? "Ses profili hazir"
+      : voiceUploadStatus === "error"
+      ? voiceError ?? "Ses profili hazirlanamadi"
+      : voiceFile
+      ? "Yukleme icin hazir"
+      : voiceUploadUnlocked
+      ? "Istersen atlayabilirsin"
+      : "Full planda aktif";
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col ambient-bg">
@@ -363,6 +492,77 @@ try {
                 </p>
               </div>
             </div>
+
+            {/* Voice sample upload */}
+            <div
+              className={`rounded-2xl border p-4 transition-all ${
+                voiceUploadUnlocked
+                  ? "border-primary/20 bg-primary/6"
+                  : "border-border/40 bg-card/35 opacity-70"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    voiceUploadUnlocked
+                      ? "bg-primary/15 text-primary"
+                      : "bg-white/5 text-muted-foreground"
+                  }`}
+                >
+                  <AudioLines className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground/85">
+                      Bu kisiye ait ses kaydi yukle
+                    </p>
+                    {!voiceUploadUnlocked && (
+                      <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground/60 leading-relaxed mt-0.5">
+                    Opsiyonel. 5. AI yanitindan sonra tek bir sesli mesaj icin kullanilir.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!voiceUploadUnlocked || loading || voiceUploadStatus === "uploading"}
+                  onClick={() => voiceInputRef.current?.click()}
+                  className="h-10 px-3 rounded-xl border border-white/10 bg-white/6 text-xs font-medium text-foreground/80 flex items-center gap-2 disabled:cursor-not-allowed disabled:text-muted-foreground/55 disabled:bg-white/3 active:scale-[0.98] transition-all"
+                >
+                  {voiceUploadStatus === "uploading" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                  {voiceFile ? "Dosyayi degistir" : "Ses dosyasi sec"}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-foreground/75 truncate">
+                    {voiceFile?.name ?? (voiceUploadUnlocked ? "MP3, WAV, M4A, WEBM" : "Yukleme kilitli")}
+                  </p>
+                  <p
+                    className={`text-[11px] truncate ${
+                      voiceUploadStatus === "error" ? "text-red-300" : "text-muted-foreground/55"
+                    }`}
+                  >
+                    {voiceStatusLabel}
+                  </p>
+                </div>
+              </div>
+
+              <input
+                ref={voiceInputRef}
+                type="file"
+                accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg"
+                className="hidden"
+                disabled={!voiceUploadUnlocked}
+                onChange={handleVoicePick}
+              />
+            </div>
           </div>
         )}
 
@@ -406,7 +606,11 @@ try {
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              {avatarFile ? "Kaydediliyor..." : "Oluşturuluyor..."}
+              {voiceUploadStatus === "uploading"
+                ? "Ses profili yukleniyor..."
+                : avatarFile || voiceFile
+                ? "Kaydediliyor..."
+                : "Oluşturuluyor..."}
             </>
           ) : (
             <>

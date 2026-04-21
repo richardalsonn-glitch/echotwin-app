@@ -7,7 +7,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Crown, Lock, Loader2, Check, CheckCheck, Mic, Square } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  Crown,
+  Lock,
+  Loader2,
+  Check,
+  CheckCheck,
+  Mic,
+  Square,
+  Play,
+  Pause,
+  AudioLines,
+} from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, formatDistanceToNow } from "date-fns";
@@ -44,6 +57,18 @@ type VoiceInputStatus = "idle" | "recording" | "transcribing";
 interface DisplayMessage extends ChatMessage {
   status?: MessageStatus;
 }
+
+type ChatStreamEvent = {
+  type: string;
+  content?: string;
+  message?: string | Partial<ChatMessage>;
+  message_count_used?: number;
+  voice_message_pending?: boolean;
+  delay?: number;
+  hold_ms?: number;
+  typing_ms?: number;
+  parts?: string[];
+};
 
 /* ─── Tick icon ──────────────────────────────────────────── */
 
@@ -107,6 +132,28 @@ function getTranscribeError(value: unknown): string {
     : "Ses mesajı okunamadı, tekrar dene";
 }
 
+function getVoiceMessageFromValue(value: unknown, personaId: string): DisplayMessage | null {
+  const data = getObjectValue(value);
+  const content = typeof data.content === "string" ? data.content : "";
+  const audioUrl = typeof data.audio_url === "string" ? data.audio_url : null;
+
+  if (!content.trim() || !audioUrl) return null;
+
+  return {
+    id: typeof data.id === "string" ? data.id : `ai-voice-${Date.now()}`,
+    persona_id: typeof data.persona_id === "string" ? data.persona_id : personaId,
+    user_id: typeof data.user_id === "string" ? data.user_id : "",
+    role: "assistant",
+    content,
+    message_type: "voice",
+    audio_url: audioUrl,
+    audio_duration_seconds:
+      typeof data.audio_duration_seconds === "number" ? data.audio_duration_seconds : null,
+    voice_provider: typeof data.voice_provider === "string" ? data.voice_provider : null,
+    created_at: typeof data.created_at === "string" ? data.created_at : new Date().toISOString(),
+  };
+}
+
 export default function ChatPage({
   params,
 }: {
@@ -120,6 +167,8 @@ export default function ChatPage({
   const scheduledTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const recordingSessionRef = useRef<AudioRecorderSession | null>(null);
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceMessageRequestRef = useRef(false);
 
   const [persona, setPersona] = useState<Persona | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -136,6 +185,7 @@ export default function ChatPage({
   const [mounted, setMounted] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [playingVoiceMessageId, setPlayingVoiceMessageId] = useState<string | null>(null);
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -178,6 +228,10 @@ export default function ChatPage({
         discardAudioRecording(recordingSessionRef.current);
         recordingSessionRef.current = null;
       }
+      if (voiceAudioRef.current) {
+        voiceAudioRef.current.pause();
+        voiceAudioRef.current = null;
+      }
     },
     []
   );
@@ -205,6 +259,10 @@ export default function ChatPage({
             user_id: serverMsg.user_id ?? "",
             role: "assistant",
             content: data.message.content,
+            message_type: serverMsg.message_type ?? "text",
+            audio_url: serverMsg.audio_url ?? null,
+            audio_duration_seconds: serverMsg.audio_duration_seconds ?? null,
+            voice_provider: serverMsg.voice_provider ?? null,
             created_at: serverMsg.created_at ?? new Date().toISOString(),
           };
           setMessages((prev) => [...prev, idleMsg]);
@@ -285,6 +343,10 @@ export default function ChatPage({
           user_id: m.user_id ?? "",
           role: m.role as "user" | "assistant",
           content: m.content,
+          message_type: m.message_type ?? "text",
+          audio_url: m.audio_url ?? null,
+          audio_duration_seconds: m.audio_duration_seconds ?? null,
+          voice_provider: m.voice_provider ?? null,
           created_at: m.created_at ?? new Date().toISOString(),
         })
       );
@@ -470,6 +532,95 @@ export default function ChatPage({
     }
   }
 
+  function stopVoicePlayback() {
+    if (voiceAudioRef.current) {
+      voiceAudioRef.current.pause();
+      voiceAudioRef.current = null;
+    }
+    setPlayingVoiceMessageId(null);
+  }
+
+  async function toggleVoicePlayback(message: DisplayMessage) {
+    if (!message.audio_url) return;
+
+    if (playingVoiceMessageId === message.id) {
+      stopVoicePlayback();
+      return;
+    }
+
+    stopVoicePlayback();
+
+    const audio = new Audio(message.audio_url);
+    voiceAudioRef.current = audio;
+    setPlayingVoiceMessageId(message.id);
+
+    audio.onended = () => {
+      if (voiceAudioRef.current === audio) {
+        voiceAudioRef.current = null;
+        setPlayingVoiceMessageId(null);
+      }
+    };
+    audio.onerror = () => {
+      if (voiceAudioRef.current === audio) {
+        voiceAudioRef.current = null;
+        setPlayingVoiceMessageId(null);
+      }
+      toast.error("Sesli mesaj oynatilamadi");
+    };
+
+    try {
+      await audio.play();
+    } catch (error) {
+      console.warn("[voice-message] playback failed", error);
+      stopVoicePlayback();
+      toast.error("Sesli mesaj oynatilamadi");
+    }
+  }
+
+  async function requestVoiceMessage(text: string, messageCountUsed: number) {
+    if (voiceMessageRequestRef.current || !text.trim()) return;
+    voiceMessageRequestRef.current = true;
+
+    try {
+      const res = await fetch("/api/voice-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          persona_id: personaId,
+          text,
+          message_count_used: messageCountUsed,
+        }),
+      });
+
+      if (!res.ok) return;
+
+      const data: unknown = await res.json().catch(() => ({}));
+      const payload = getObjectValue(data);
+      const voiceMessage = getVoiceMessageFromValue(payload.message, personaId);
+      if (!voiceMessage) return;
+
+      setMessages((prev) => [...prev, voiceMessage]);
+      setPersona((p) =>
+        p
+          ? {
+              ...p,
+              voice_message_sent: true,
+              voice_message_sent_at: voiceMessage.created_at,
+            }
+          : p
+      );
+      onResponseDelivered(
+        "Sesli mesaj",
+        persona?.display_name ?? "AI",
+        persona?.avatar_url ?? undefined
+      );
+    } catch (error) {
+      console.warn("[voice-message] request failed", error);
+    } finally {
+      voiceMessageRequestRef.current = false;
+    }
+  }
+
   async function sendMessage(messageOverride?: string) {
     const content = (messageOverride ?? input).trim();
     if (!content || sending || limitReached) return;
@@ -491,6 +642,10 @@ export default function ChatPage({
       user_id: "",
       role: "user",
       content,
+      message_type: "text",
+      audio_url: null,
+      audio_duration_seconds: null,
+      voice_provider: null,
       created_at: new Date().toISOString(),
       status: "sent",
     };
@@ -547,16 +702,7 @@ export default function ChatPage({
           if (!jsonStr) continue;
 
           try {
-            const event = JSON.parse(jsonStr) as {
-              type: string;
-              content?: string;
-              message?: string;
-              message_count_used?: number;
-              delay?: number;
-              hold_ms?: number;
-              typing_ms?: number;
-              parts?: string[];
-            };
+            const event = JSON.parse(jsonStr) as ChatStreamEvent;
 
             if (event.type === "typing_delay") {
               setIsTyping(true);
@@ -586,6 +732,10 @@ export default function ChatPage({
                   user_id: "",
                   role: "assistant",
                   content: event.content,
+                  message_type: "text",
+                  audio_url: null,
+                  audio_duration_seconds: null,
+                  voice_provider: null,
                   created_at: new Date().toISOString(),
                 };
                 setMessages((prev) => [...prev, partMsg]);
@@ -629,6 +779,10 @@ export default function ChatPage({
                       user_id: "",
                       role: "assistant",
                       content: part,
+                      message_type: "text",
+                      audio_url: null,
+                      audio_duration_seconds: null,
+                      voice_provider: null,
                       created_at: new Date().toISOString(),
                     };
                     setMessages((prev) => [...prev, newMsg]);
@@ -670,13 +824,13 @@ export default function ChatPage({
             } else if (event.type === "done") {
               setIsTyping(false);
               setStreamingContent("");
+              const deliveredText = (fullResponse || event.content || "").trim();
               setMessages((prev) => {
                 const withReadStatus = prev.map((m) =>
                   m.id === optId ? { ...m, status: "read" as MessageStatus } : m
                 );
 
-                const text = (fullResponse || event.content || "").trim();
-                if (!text) return withReadStatus;
+                if (!deliveredText) return withReadStatus;
 
                 return [
                   ...withReadStatus,
@@ -685,7 +839,11 @@ export default function ChatPage({
                     persona_id: personaId,
                     user_id: "",
                     role: "assistant",
-                    content: text,
+                    content: deliveredText,
+                    message_type: "text",
+                    audio_url: null,
+                    audio_duration_seconds: null,
+                    voice_provider: null,
                     created_at: new Date().toISOString(),
                   },
                 ];
@@ -696,12 +854,15 @@ export default function ChatPage({
                 );
               }
               // Play sound once per response (fullResponse accumulated from chunks)
-              if (fullResponse.trim()) {
+              if (deliveredText) {
                 onResponseDelivered(
-                  fullResponse.trim(),
+                  deliveredText,
                   persona?.display_name ?? "AI",
                   persona?.avatar_url ?? undefined
                 );
+              }
+              if (event.voice_message_pending && event.message_count_used !== undefined) {
+                void requestVoiceMessage(deliveredText, event.message_count_used);
               }
               clearPresenceTimer();
               setPresence("recent_online");
@@ -712,7 +873,7 @@ export default function ChatPage({
               }, 4000);
               if ((event.message_count_used ?? 0) >= FREE_LIMIT) checkLimit();
             } else if (event.type === "error") {
-              toast.error(event.message ?? "AI hatası");
+              toast.error(typeof event.message === "string" ? event.message : "AI hatası");
               setIsTyping(false);
               setStreamingContent("");
               setMessages((prev) => prev.filter((m) => m.id !== optId));
@@ -925,6 +1086,8 @@ export default function ChatPage({
             const avatarVisible = !isUser && showAvatar(index);
             const sameAsPrev = index > 0 && messages[index - 1].role === msg.role;
             const sameAsNext = index < messages.length - 1 && messages[index + 1].role === msg.role;
+            const isVoiceMessage = !isUser && msg.message_type === "voice" && Boolean(msg.audio_url);
+            const isPlayingVoice = playingVoiceMessageId === msg.id;
 
             return (
               <motion.div
@@ -953,16 +1116,55 @@ export default function ChatPage({
                 )}
 
                 <div
-                  className={`max-w-[76%] ${isUser ? "bubble-sent" : "bubble-received"} px-3.5 py-2`}
+                  className={`max-w-[76%] ${isUser ? "bubble-sent" : "bubble-received"} ${
+                    isVoiceMessage ? "px-3 py-2.5 min-w-[210px]" : "px-3.5 py-2"
+                  }`}
                   style={
                     isUser
                       ? { borderRadius: sameAsPrev ? "18px 5px 5px 18px" : sameAsNext ? "18px 18px 5px 18px" : undefined }
                       : { borderRadius: sameAsPrev ? "5px 18px 18px 5px" : sameAsNext ? "5px 18px 18px 18px" : undefined }
                   }
                 >
-                  <p className="text-[14px] leading-[1.45] whitespace-pre-wrap break-words">
-                    {msg.content}
-                  </p>
+                  {isVoiceMessage ? (
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        aria-label={isPlayingVoice ? "Sesli mesajı duraklat" : "Sesli mesajı oynat"}
+                        className="h-9 w-9 rounded-full bg-primary/18 border border-primary/25 flex items-center justify-center shrink-0 active:scale-95 transition-all"
+                        onClick={() => void toggleVoicePlayback(msg)}
+                      >
+                        {isPlayingVoice ? (
+                          <Pause className="h-4 w-4 text-primary fill-primary" />
+                        ) : (
+                          <Play className="h-4 w-4 text-primary fill-primary ml-0.5" />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <AudioLines className="h-3.5 w-3.5 text-primary/80 shrink-0" />
+                          <span className="text-[13px] font-medium text-white/86">Sesli mesaj</span>
+                        </div>
+                        <div className="mt-1.5 h-5 flex items-center gap-[3px]" aria-hidden="true">
+                          {[10, 16, 22, 13, 19, 25, 15, 21, 12, 18, 24, 14].map((height, waveIndex) => (
+                            <span
+                              key={waveIndex}
+                              className={`w-[3px] rounded-full ${
+                                isPlayingVoice ? "bg-primary/80" : "bg-white/28"
+                              }`}
+                              style={{
+                                height,
+                                opacity: isPlayingVoice ? 0.55 + (waveIndex % 4) * 0.1 : 0.55,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[14px] leading-[1.45] whitespace-pre-wrap break-words">
+                      {msg.content}
+                    </p>
+                  )}
                   <div
                     className={`flex items-center gap-1 mt-0.5 ${isUser ? "justify-end" : "justify-start"}`}
                   >

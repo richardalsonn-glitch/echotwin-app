@@ -4,7 +4,9 @@ import { getAiErrorResponse } from "@/lib/ai/errors";
 import { runPersonaChat } from "@/lib/ai/agent";
 import { buildChatSystemPrompt, calculateTypingDelay } from "@/lib/ai/prompts";
 import { canSendMessage } from "@/lib/subscription/limits";
-import type { PersonaAnalysis } from "@/types/persona";
+import { shouldQueuePersonaVoiceMessage } from "@/lib/voice/message";
+import type { Persona, PersonaAnalysis } from "@/types/persona";
+import type { SubscriptionTier } from "@/types/subscription";
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    const tier = (profile?.subscription_tier as "free" | "basic" | "full") ?? "free";
+    const tier = toSubscriptionTier(profile?.subscription_tier);
     const { allowed, reason } = canSendMessage(tier, persona.message_count_used);
 
     if (!allowed) {
@@ -119,6 +121,13 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          const nextMessageCount = persona.message_count_used + 1;
+          const voiceMessagePending = shouldQueuePersonaVoiceMessage(
+            persona as Persona,
+            tier,
+            nextMessageCount
+          );
+
           // Save assistant message and increment counter
           await Promise.all([
             supabase.from("messages").insert({
@@ -130,7 +139,7 @@ export async function POST(request: NextRequest) {
             supabase
               .from("personas")
               .update({
-                message_count_used: persona.message_count_used + 1,
+                message_count_used: nextMessageCount,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", persona_id),
@@ -141,7 +150,8 @@ export async function POST(request: NextRequest) {
               `data: ${JSON.stringify({
                 type: "done",
                 content: fullResponse,
-                message_count_used: persona.message_count_used + 1,
+                message_count_used: nextMessageCount,
+                voice_message_pending: voiceMessagePending,
               })}\n\n`
             )
           );
@@ -173,4 +183,8 @@ export async function POST(request: NextRequest) {
       { status: aiError.status }
     );
   }
+}
+
+function toSubscriptionTier(value: unknown): SubscriptionTier {
+  return value === "basic" || value === "full" ? value : "free";
 }
