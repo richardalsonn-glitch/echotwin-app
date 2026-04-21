@@ -21,6 +21,8 @@ import {
   Pause,
   AudioLines,
   ImagePlus,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -54,8 +56,16 @@ const FREE_LIMIT = 5;
 
 type MessageStatus = "sent" | "delivered" | "read";
 type PresenceState = "idle" | "online" | "typing" | "recent_online";
-type VoiceInputStatus = "idle" | "recording" | "transcribing";
+type VoiceInputStatus = "idle" | "recording" | "stopping" | "preview" | "sending" | "transcribing";
 type PhotoInputStatus = "idle" | "uploading";
+
+type VoicePreview = {
+  blob: Blob;
+  url: string;
+  durationMs: number;
+  mimeType: string;
+  sizeBytes: number;
+};
 
 interface DisplayMessage extends ChatMessage {
   status?: MessageStatus;
@@ -72,6 +82,15 @@ type ChatStreamEvent = {
   typing_ms?: number;
   parts?: string[];
 };
+
+const VOICE_LEVEL_BAR_COUNT = 14;
+const IDLE_VOICE_LEVELS = Array.from({ length: VOICE_LEVEL_BAR_COUNT }, () => 0.14);
+const PREVIEW_VOICE_LEVELS = [0.28, 0.46, 0.34, 0.72, 0.52, 0.82, 0.42, 0.64, 0.9, 0.5, 0.76, 0.38, 0.58, 0.32];
+
+type WindowWithWebkitAudioContext = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
 
 /* ─── Tick icon ──────────────────────────────────────────── */
 
@@ -133,6 +152,15 @@ function getTranscribeError(value: unknown): string {
   return typeof data.error === "string" && data.error.trim()
     ? data.error.trim()
     : "Ses mesajı okunamadı, tekrar dene";
+}
+
+function formatVoiceDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
 }
 
 function getVoiceMessageFromValue(value: unknown, personaId: string): DisplayMessage | null {
@@ -206,7 +234,11 @@ export default function ChatPage({
   const scheduledTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const recordingSessionRef = useRef<AudioRecorderSession | null>(null);
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const levelAnimationRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voicePreviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceMessageRequestRef = useRef(false);
 
   const [persona, setPersona] = useState<Persona | null>(null);
@@ -224,6 +256,10 @@ export default function ChatPage({
   const [mounted, setMounted] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voicePreview, setVoicePreview] = useState<VoicePreview | null>(null);
+  const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
+  const [voiceLevels, setVoiceLevels] = useState<number[]>(IDLE_VOICE_LEVELS);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
   const [photoStatus, setPhotoStatus] = useState<PhotoInputStatus>("idle");
   const [playingVoiceMessageId, setPlayingVoiceMessageId] = useState<string | null>(null);
 
@@ -258,11 +294,107 @@ export default function ChatPage({
     }
   }
 
+  function clearRecordingInterval() {
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+  }
+
+  function stopLevelMeter(resetLevels = true) {
+    if (levelAnimationRef.current !== null) {
+      window.cancelAnimationFrame(levelAnimationRef.current);
+      levelAnimationRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      const context = audioContextRef.current;
+      audioContextRef.current = null;
+      if (context.state !== "closed") {
+        void context.close().catch(() => undefined);
+      }
+    }
+
+    if (resetLevels) setVoiceLevels(IDLE_VOICE_LEVELS);
+  }
+
+  function startLevelMeter(stream: MediaStream) {
+    stopLevelMeter(false);
+
+    try {
+      const AudioContextConstructor =
+        window.AudioContext ?? (window as WindowWithWebkitAudioContext).webkitAudioContext;
+
+      if (!AudioContextConstructor) {
+        setVoiceLevels(IDLE_VOICE_LEVELS);
+        return;
+      }
+
+      const context = new AudioContextConstructor();
+      const analyser = context.createAnalyser();
+      const source = context.createMediaStreamSource(stream);
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.76;
+      source.connect(analyser);
+      audioContextRef.current = context;
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const bucketSize = Math.max(1, Math.floor(data.length / VOICE_LEVEL_BAR_COUNT));
+
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        const levels = Array.from({ length: VOICE_LEVEL_BAR_COUNT }, (_, index) => {
+          const start = index * bucketSize;
+          const end = Math.min(data.length, start + bucketSize);
+          let sum = 0;
+
+          for (let i = start; i < end; i += 1) {
+            sum += data[i] ?? 0;
+          }
+
+          const average = end > start ? sum / (end - start) : 0;
+          return Math.min(1, Math.max(0.14, (average / 255) * 1.9));
+        });
+
+        setVoiceLevels(levels);
+        levelAnimationRef.current = window.requestAnimationFrame(tick);
+      };
+
+      tick();
+    } catch (error) {
+      console.warn("[voice-input] level meter unavailable", error);
+      stopLevelMeter(false);
+      setVoiceLevels(IDLE_VOICE_LEVELS);
+    }
+  }
+
+  function stopVoicePreviewPlayback() {
+    if (voicePreviewAudioRef.current) {
+      voicePreviewAudioRef.current.pause();
+      voicePreviewAudioRef.current = null;
+    }
+    setPreviewPlaying(false);
+  }
+
+  function clearVoicePreview() {
+    stopVoicePreviewPlayback();
+    setVoicePreview(null);
+    setRecordingElapsedMs(0);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (voicePreview?.url) URL.revokeObjectURL(voicePreview.url);
+    };
+  }, [voicePreview?.url]);
+
   useEffect(
     () => () => {
       clearPresenceTimer();
       clearScheduledTimers();
       clearRecordingTimeout();
+      clearRecordingInterval();
+      stopLevelMeter(false);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       if (recordingSessionRef.current) {
         discardAudioRecording(recordingSessionRef.current);
@@ -271,6 +403,10 @@ export default function ChatPage({
       if (voiceAudioRef.current) {
         voiceAudioRef.current.pause();
         voiceAudioRef.current = null;
+      }
+      if (voicePreviewAudioRef.current) {
+        voicePreviewAudioRef.current.pause();
+        voicePreviewAudioRef.current = null;
       }
     },
     []
@@ -511,15 +647,24 @@ export default function ChatPage({
   async function startVoiceInput() {
     try {
       setVoiceError(null);
+      clearVoicePreview();
       const session = await startAudioRecording();
       recordingSessionRef.current = session;
+      setRecordingElapsedMs(0);
+      setVoiceLevels(IDLE_VOICE_LEVELS);
       setVoiceStatus("recording");
+      startLevelMeter(session.stream);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingElapsedMs(Date.now() - session.startedAt);
+      }, 250);
       recordingTimeoutRef.current = setTimeout(() => {
         void finishVoiceRecording();
       }, MAX_RECORDING_MS);
     } catch (error) {
       const message = getAudioRecorderUserMessage(error);
       console.warn("[voice-input] recording failed", error);
+      clearRecordingInterval();
+      stopLevelMeter();
       setVoiceStatus("idle");
       setVoiceError(message);
       toast.error(message);
@@ -532,10 +677,13 @@ export default function ChatPage({
     recordingSessionRef.current = null;
 
     clearRecordingTimeout();
-    setVoiceStatus("transcribing");
+    clearRecordingInterval();
+    stopLevelMeter();
+    setVoiceStatus("stopping");
     setVoiceError(null);
 
     try {
+      const durationMs = Math.max(0, Date.now() - session.startedAt);
       const audioBlob = await stopAudioRecording(session);
 
       if (audioBlob.size < MIN_AUDIO_BYTES) {
@@ -546,8 +694,47 @@ export default function ChatPage({
         throw new Error("Ses kaydı çok uzun, daha kısa tekrar dene");
       }
 
+      setRecordingElapsedMs(durationMs);
+      setVoicePreview({
+        blob: audioBlob,
+        url: URL.createObjectURL(audioBlob),
+        durationMs,
+        mimeType: audioBlob.type || session.mimeType,
+        sizeBytes: audioBlob.size,
+      });
+      setVoiceStatus("preview");
+    } catch (error) {
+      console.warn("[voice-input] recording preview failed", error);
+      recordingSessionRef.current = null;
+      setVoiceStatus("idle");
+      setRecordingElapsedMs(0);
+      const rawMessage = error instanceof Error ? error.message : "";
+      const message = rawMessage.startsWith("Ses ")
+        ? rawMessage
+        : "Ses mesajı okunamadı, tekrar dene";
+      setVoiceError(message);
+      toast.error(message);
+    }
+  }
+
+  async function sendVoicePreview() {
+    if (!voicePreview || sending || limitReached) return;
+
+    setVoiceStatus("sending");
+    setVoiceError(null);
+
+    try {
+      if (voicePreview.sizeBytes < MIN_AUDIO_BYTES) {
+        throw new Error("Ses mesajı okunamadı, tekrar dene");
+      }
+
+      if (voicePreview.sizeBytes > MAX_AUDIO_BYTES) {
+        throw new Error("Ses kaydı çok uzun, daha kısa tekrar dene");
+      }
+
       const formData = new FormData();
-      formData.append("audio", createAudioFile(audioBlob));
+      formData.append("audio", createAudioFile(voicePreview.blob));
+      setVoiceStatus("transcribing");
 
       const res = await fetch("/api/transcribe", {
         method: "POST",
@@ -564,19 +751,61 @@ export default function ChatPage({
         throw new Error("Ses mesajı okunamadı, tekrar dene");
       }
 
-      setVoiceStatus("idle");
       setVoiceError(null);
+      clearVoicePreview();
+      setVoiceStatus("idle");
       await sendMessage(transcript);
     } catch (error) {
       console.warn("[voice-input] transcription failed", error);
-      recordingSessionRef.current = null;
-      setVoiceStatus("idle");
+      setVoiceStatus("preview");
       const rawMessage = error instanceof Error ? error.message : "";
       const message = rawMessage.startsWith("Ses ")
         ? rawMessage
         : "Ses mesajı okunamadı, tekrar dene";
       setVoiceError(message);
       toast.error(message);
+    }
+  }
+
+  async function restartVoiceRecording() {
+    clearVoicePreview();
+    await startVoiceInput();
+  }
+
+  async function toggleVoicePreviewPlayback() {
+    if (!voicePreview) return;
+
+    if (voicePreviewAudioRef.current && previewPlaying) {
+      voicePreviewAudioRef.current.pause();
+      setPreviewPlaying(false);
+      return;
+    }
+
+    if (!voicePreviewAudioRef.current) {
+      const audio = new Audio(voicePreview.url);
+      voicePreviewAudioRef.current = audio;
+      audio.onended = () => {
+        if (voicePreviewAudioRef.current === audio) {
+          audio.currentTime = 0;
+          setPreviewPlaying(false);
+        }
+      };
+      audio.onerror = () => {
+        if (voicePreviewAudioRef.current === audio) {
+          voicePreviewAudioRef.current = null;
+          setPreviewPlaying(false);
+        }
+        toast.error("Ses kaydı oynatılamadı");
+      };
+    }
+
+    try {
+      await voicePreviewAudioRef.current.play();
+      setPreviewPlaying(true);
+    } catch (error) {
+      console.warn("[voice-input] preview playback failed", error);
+      stopVoicePreviewPlayback();
+      toast.error("Ses kaydı oynatılamadı");
     }
   }
 
@@ -1091,7 +1320,7 @@ export default function ChatPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0B1220" }}>
+      <div className="min-h-[100svh] flex items-center justify-center" style={{ background: "#0B1220" }}>
         <Loader2 className="h-7 w-7 animate-spin text-primary" />
       </div>
     );
@@ -1105,21 +1334,31 @@ export default function ChatPage({
   const voiceStatusText =
     photoStatus === "uploading"
       ? "Fotoğraf yükleniyor..."
-      : voiceStatus === "recording"
-      ? "Dinliyorum..."
-      : voiceStatus === "transcribing"
+      : voiceStatus === "transcribing" || voiceStatus === "sending"
       ? "Ses çözümleniyor..."
       : voiceError;
   const textSendDisabled =
     !input.trim() || sending || voiceStatus !== "idle" || photoStatus !== "idle";
+  const voiceActionDisabled =
+    sending ||
+    photoStatus === "uploading" ||
+    voiceStatus === "stopping" ||
+    voiceStatus === "preview" ||
+    voiceStatus === "sending" ||
+    voiceStatus === "transcribing";
+  const activeVoiceLevels = voiceStatus === "preview" ? PREVIEW_VOICE_LEVELS : voiceLevels;
 
   return (
-    <div className="max-w-md mx-auto flex flex-col h-screen" style={{ background: "#0B1220" }}>
+    <div
+      className="max-w-md mx-auto flex min-h-[100svh] h-[100dvh] flex-col overflow-hidden"
+      style={{ background: "#0B1220", minHeight: "100svh", height: "100dvh" }}
+    >
 
       {/* ── Header ── */}
       <div
-        className="sticky top-0 z-10 flex items-center gap-3 px-3 py-2.5"
+        className="sticky top-0 z-10 flex shrink-0 items-center gap-3 px-3 pb-2.5"
         style={{
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.625rem)",
           background: "rgba(10,17,33,0.92)",
           backdropFilter: "blur(20px)",
           borderBottom: "1px solid rgba(255,255,255,0.055)",
@@ -1179,14 +1418,14 @@ export default function ChatPage({
 
       {/* ── Messages ── */}
       <div
-        className="flex-1 overflow-y-auto px-3 pt-4 pb-2"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-4 pb-2"
         style={{
           backgroundImage: "radial-gradient(ellipse 70% 40% at 50% 0%, rgba(20,184,166,0.04) 0%, transparent 60%)",
         }}
       >
 
         {messages.length === 0 && !streamingContent && !isTyping && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-6">
+          <div className="flex min-h-full flex-col items-center justify-center px-6 py-8 text-center">
             <div className="relative mb-5">
               <Avatar
                 className="h-24 w-24"
@@ -1473,13 +1712,150 @@ export default function ChatPage({
       {/* ── Input ── */}
       {!limitReached && (
         <div
-          className="px-3 py-3 safe-bottom"
+          className="shrink-0 px-3 pt-3"
           style={{
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)",
             background: "rgba(9,15,28,0.95)",
             backdropFilter: "blur(20px)",
             borderTop: "1px solid rgba(255,255,255,0.05)",
           }}
         >
+          <AnimatePresence initial={false}>
+            {voiceStatus !== "idle" && (
+              <motion.div
+                key="voice-recorder-panel"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.16 }}
+                className="mb-3 rounded-[24px] border border-primary/18 bg-[#0f1a2e]/92 p-3 shadow-[0_16px_44px_rgba(0,0,0,0.28)]"
+              >
+                {(voiceStatus === "recording" || voiceStatus === "stopping") && (
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-400/25 bg-red-500/12">
+                      <span className="absolute h-8 w-8 rounded-full bg-red-400/20 animate-ping" />
+                      <Mic className="relative h-5 w-5 text-red-200" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[13px] font-semibold text-white/90">
+                          {voiceStatus === "stopping" ? "Kayıt hazırlanıyor..." : "Dinliyorum..."}
+                        </p>
+                        <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-white/78">
+                          {formatVoiceDuration(recordingElapsedMs)}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex h-8 items-center gap-[3px]" aria-hidden="true">
+                        {voiceLevels.map((level, index) => (
+                          <span
+                            key={index}
+                            className="w-[3px] rounded-full bg-primary/80 shadow-[0_0_10px_rgba(20,184,166,0.28)]"
+                            style={{ height: `${Math.round(7 + level * 25)}px` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Kaydı bitir"
+                      title="Kaydı bitir"
+                      disabled={voiceStatus === "stopping"}
+                      onClick={() => void finishVoiceRecording()}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-400/30 bg-red-500/14 text-red-200 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {voiceStatus === "stopping" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Square className="h-3.5 w-3.5 fill-red-200" />
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {voiceStatus === "preview" && voicePreview && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        aria-label={previewPlaying ? "Ön izlemeyi duraklat" : "Ön izlemeyi oynat"}
+                        title={previewPlaying ? "Duraklat" : "Dinle"}
+                        onClick={() => void toggleVoicePreviewPlayback()}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/30 bg-primary/14 text-primary transition-all active:scale-95"
+                      >
+                        {previewPlaying ? (
+                          <Pause className="h-4 w-4 fill-primary" />
+                        ) : (
+                          <Play className="ml-0.5 h-4 w-4 fill-primary" />
+                        )}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="truncate text-[13px] font-semibold text-white/90">
+                            Göndermeden önce dinle
+                          </p>
+                          <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-white/78">
+                            {formatVoiceDuration(voicePreview.durationMs)}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex h-7 items-center gap-[3px]" aria-hidden="true">
+                          {activeVoiceLevels.map((level, index) => (
+                            <span
+                              key={index}
+                              className={`w-[3px] rounded-full ${
+                                previewPlaying ? "bg-primary/85" : "bg-white/30"
+                              }`}
+                              style={{ height: `${Math.round(7 + level * 21)}px` }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={clearVoicePreview}
+                        className="flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-white/8 bg-white/6 text-[12px] font-medium text-white/70 transition-all active:scale-[0.98]"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Sil
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void restartVoiceRecording()}
+                        className="flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-white/8 bg-white/6 text-[12px] font-medium text-white/70 transition-all active:scale-[0.98]"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Yeniden
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void sendVoicePreview()}
+                        className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary text-[12px] font-semibold text-primary-foreground shadow-[0_0_18px_rgba(20,184,166,0.22)] transition-all active:scale-[0.98]"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Gönder
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(voiceStatus === "sending" || voiceStatus === "transcribing") && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-primary/12">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-white/90">Ses çözümleniyor...</p>
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-white/45">
+                        Metne çevrilince normal mesaj olarak gönderilecek.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="flex gap-2 items-end">
             <div className="flex-1 relative">
               <Input
@@ -1535,7 +1911,7 @@ export default function ChatPage({
                 background:
                   voiceStatus === "recording"
                     ? "rgba(239,68,68,0.16)"
-                    : voiceStatus === "transcribing"
+                    : voiceStatus === "transcribing" || voiceStatus === "sending" || voiceStatus === "stopping"
                     ? "rgba(20,184,166,0.12)"
                     : "rgba(255,255,255,0.07)",
                 border:
@@ -1548,9 +1924,9 @@ export default function ChatPage({
                     : "none",
               }}
               onClick={() => void handleVoiceButtonClick()}
-              disabled={sending || photoStatus === "uploading" || voiceStatus === "transcribing"}
+              disabled={voiceActionDisabled}
             >
-              {voiceStatus === "transcribing" ? (
+              {voiceStatus === "transcribing" || voiceStatus === "sending" || voiceStatus === "stopping" ? (
                 <Loader2 className="h-4 w-4 text-primary animate-spin" />
               ) : voiceStatus === "recording" ? (
                 <Square className="h-3.5 w-3.5 text-red-300 fill-red-300" />
@@ -1584,7 +1960,7 @@ export default function ChatPage({
           {voiceStatusText && (
             <p
               className={`mt-2 px-1 text-[11.5px] ${
-                voiceError && voiceStatus === "idle" ? "text-red-300" : "text-white/45"
+                voiceError ? "text-red-300" : "text-white/45"
               }`}
             >
               {voiceStatusText}

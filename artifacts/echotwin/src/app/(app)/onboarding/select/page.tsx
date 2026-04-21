@@ -358,18 +358,32 @@ try {
 
       <div className="flex-1 px-5 py-7 space-y-7">
         {/* Title */}
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight mb-1.5">Kiminle sohbet etmek istiyorsun?</h2>
-          <p className="text-muted-foreground text-sm">
-            Sohbette {participants.length} kişi var —{" "}
-            <span className="text-foreground/70">en çok yazan üstte</span>
+        <div className="rounded-3xl border border-primary/12 bg-card/45 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.18)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/70">
+            Kişi seçimi
+          </p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            Kiminle sohbet etmek istiyorsun?
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Sohbette {participants.length} kişi var. Aşağıdaki kartlardan konuşmak istediğin kişiyi seç.
           </p>
         </div>
 
         {/* Participant cards */}
-        <div className="space-y-2.5">
-          <Label className="text-sm font-medium text-foreground/70">Kişiyi Seç</Label>
-          <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <Label className="text-sm font-semibold text-foreground/85">Kişiyi Seç</Label>
+              <p className="mt-1 text-xs text-muted-foreground/60">
+                En çok mesaj atan kişiler üstte listelenir.
+              </p>
+            </div>
+            <span className="rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1 text-[11px] font-medium text-primary/80">
+              {participants.length} kişi
+            </span>
+          </div>
+          <div className="space-y-2.5 rounded-3xl border border-white/8 bg-white/[0.03] p-2.5">
             {participants.map((name) => {
               const stat = stats[name];
               const msgCount = stat?.message_count ?? null;
@@ -379,38 +393,64 @@ try {
               return (
                 <button
                   key={name}
-                  className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all active:scale-[0.98] ${
+                  className={`group relative w-full overflow-hidden rounded-2xl border p-4 text-left transition-all active:scale-[0.98] ${
                     isSelected
-                      ? "border-primary/50 bg-primary/8 glow-teal"
-                      : "border-border/40 bg-card/50 hover:border-primary/25 hover:bg-card/70"
+                      ? "border-primary/65 bg-primary/[0.13] shadow-[0_0_28px_rgba(20,184,166,0.16)] ring-1 ring-primary/25"
+                      : "border-white/8 bg-[#0f1a2e]/88 shadow-[0_10px_30px_rgba(0,0,0,0.18)] hover:border-primary/35 hover:bg-primary/[0.07] hover:shadow-[0_0_22px_rgba(20,184,166,0.10)]"
                   }`}
                   onClick={() => {
                     handleSelectTarget(name);
                   }}
                 >
-                  <Avatar className={`h-11 w-11 shrink-0 border ${colorClass}`}>
-                    <AvatarFallback className={`font-bold text-sm ${colorClass}`}>
-                      {getInitials(name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div
+                    className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity ${
+                      isSelected ? "opacity-100" : "group-hover:opacity-100"
+                    }`}
+                    style={{
+                      background:
+                        "radial-gradient(circle at 18% 18%, rgba(20,184,166,0.16), transparent 38%)",
+                    }}
+                  />
+                  <div className="relative flex items-center gap-4">
+                    <Avatar
+                      className={`h-12 w-12 shrink-0 border-2 transition-all ${
+                        isSelected ? "border-primary/55 shadow-[0_0_24px_rgba(20,184,166,0.18)]" : colorClass
+                      }`}
+                    >
+                      <AvatarFallback className={`font-bold text-sm ${colorClass}`}>
+                        {getInitials(name)}
+                      </AvatarFallback>
+                    </Avatar>
 
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{name}</p>
-                    {msgCount !== null && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <MessageCircle className="h-3 w-3 text-muted-foreground/50" />
-                        <span className="text-xs text-muted-foreground/60">
-                          {formatMessageCount(msgCount)} mesaj
-                        </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[15px] font-semibold text-foreground">{name}</p>
+                        {isSelected && (
+                          <span className="shrink-0 rounded-full border border-primary/25 bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                            Seçildi
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-
-                  {isSelected && (
-                    <div className="h-6 w-6 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center shrink-0">
-                      <Check className="h-3.5 w-3.5 text-primary" />
+                      {msgCount !== null && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <MessageCircle className="h-3.5 w-3.5 text-primary/65" />
+                          <span className="text-xs font-medium text-muted-foreground/70">
+                            {formatMessageCount(msgCount)} mesaj
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all ${
+                        isSelected
+                          ? "border-primary/55 bg-primary/20 text-primary"
+                          : "border-white/10 bg-white/[0.04] text-white/28 group-hover:border-primary/25 group-hover:text-primary/75"
+                      }`}
+                    >
+                      <Check className="h-4 w-4" />
+                    </div>
+                  </div>
                 </button>
               );
             })}
