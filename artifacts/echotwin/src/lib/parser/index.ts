@@ -1,2 +1,2 @@
 export { parseWhatsAppChat } from "./whatsapp";
-export type { ParsedMessage, ParsedChat } from "./types";
+export type { ParsedMessage, ParsedChat, ParsedMediaItem } from "./types";

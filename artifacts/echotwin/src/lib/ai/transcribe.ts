@@ -1,8 +1,9 @@
 import OpenAI from "openai";
 import { AiServiceError } from "./types";
+import { MAX_AUDIO_BYTES } from "@/lib/media/limits";
 
 export const TRANSCRIBE_MIN_AUDIO_BYTES = 1024;
-export const TRANSCRIBE_MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+export const TRANSCRIBE_MAX_AUDIO_BYTES = MAX_AUDIO_BYTES;
 
 type ProviderErrorShape = {
   status?: number;

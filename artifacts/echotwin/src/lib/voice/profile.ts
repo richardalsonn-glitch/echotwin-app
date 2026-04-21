@@ -1,11 +1,12 @@
 import type { SubscriptionTier } from "@/types/subscription";
 import type { VoiceProfileMetadata } from "@/types/persona";
+import { MAX_AUDIO_BYTES } from "@/lib/media/limits";
 
 export const VOICE_SAMPLE_BUCKET = "voice-samples";
 export const VOICE_MESSAGE_BUCKET = "voice-messages";
 
 export const VOICE_SAMPLE_MIN_BYTES = 8 * 1024;
-export const VOICE_SAMPLE_MAX_BYTES = 15 * 1024 * 1024;
+export const VOICE_SAMPLE_MAX_BYTES = MAX_AUDIO_BYTES;
 
 export type VoiceSampleValidation =
   | { ok: true }
@@ -29,7 +30,7 @@ export function validateVoiceSampleFile(file: File): VoiceSampleValidation {
     return {
       ok: false,
       status: 413,
-      userMessage: "Ses ornegi cok buyuk, daha kisa bir kayit yukle",
+      userMessage: "Ses dosyasi 50 MB'dan buyuk olamaz",
       debugMessage: `Voice sample is too large: ${file.size} bytes`,
     };
   }

@@ -1,5 +1,7 @@
+import { MAX_AUDIO_BYTES as MAX_ALLOWED_AUDIO_BYTES } from "@/lib/media/limits";
+
 export const MIN_AUDIO_BYTES = 1024;
-export const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+export const MAX_AUDIO_BYTES = MAX_ALLOWED_AUDIO_BYTES;
 export const MAX_RECORDING_MS = 60_000;
 
 const MIME_TYPE_CANDIDATES = [

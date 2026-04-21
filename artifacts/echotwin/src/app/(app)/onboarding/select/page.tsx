@@ -514,14 +514,14 @@ try {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-foreground/85">
-                      Bu kisiye ait ses kaydi yukle
+                      Bu kişiye ait ses kaydı yükle
                     </p>
                     {!voiceUploadUnlocked && (
                       <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground/60 leading-relaxed mt-0.5">
-                    Opsiyonel. 5. AI yanitindan sonra tek bir sesli mesaj icin kullanilir.
+                    Ses dosyası en az 20 sn olmalıdır. Daha gerçekçi bir klon ses kaydı için 1 dakikadan az olmamalıdır.
                   </p>
                 </div>
               </div>
@@ -538,7 +538,7 @@ try {
                   ) : (
                     <Upload className="h-3.5 w-3.5" />
                   )}
-                  {voiceFile ? "Dosyayi degistir" : "Ses dosyasi sec"}
+                  {voiceFile ? "Dosyayı değiştir" : "Ses dosyası seç"}
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-foreground/75 truncate">

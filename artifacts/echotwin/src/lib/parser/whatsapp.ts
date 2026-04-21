@@ -1,4 +1,5 @@
-import { ParsedMessage, ParsedChat } from "./types";
+import { getMediaKindFromFileName, type MediaKind } from "@/lib/media/files";
+import { ParsedMessage, ParsedChat, ParsedMediaItem } from "./types";
 
 // Supported WhatsApp export formats:
 // [DD/MM/YYYY, HH:MM:SS] Name: Message
@@ -30,14 +31,40 @@ const MEDIA_INDICATORS = [
   ".mp3",
   ".pdf",
   ".webp",
+  ".jpeg",
+  ".gif",
+  ".heic",
+  ".m4a",
+  ".opus",
 ];
 
 const QUESTION_WORDS_TR = ["mi", "mı", "mu", "mü", "ne", "nasıl", "neden", "niye", "kim", "nerede", "ne zaman", "hangi", "kaç"];
 const QUESTION_WORDS_EN = ["what", "how", "why", "who", "where", "when", "which", "whose", "whom", "could", "would", "should", "can", "will", "do", "does", "did", "is", "are", "was", "were"];
 
+const MEDIA_FILE_PATTERN =
+  /([\p{L}\p{N}_ .()@+\-'[\]]+\.(?:jpe?g|png|webp|gif|heic|heif|mp4|mov|m4v|mp3|m4a|wav|ogg|opus|aac|pdf|webm))/iu;
+
+function extractMediaFileName(content: string): string | null {
+  const match = content.match(MEDIA_FILE_PATTERN);
+  return match?.[1]?.trim() ?? null;
+}
+
 function isMedia(content: string): boolean {
   const lower = content.toLowerCase();
-  return MEDIA_INDICATORS.some((indicator) => lower.includes(indicator.toLowerCase()));
+  return (
+    MEDIA_INDICATORS.some((indicator) => lower.includes(indicator.toLowerCase())) ||
+    extractMediaFileName(content) !== null
+  );
+}
+
+function getMediaType(content: string, fileName: string | null): MediaKind | null {
+  if (fileName) return getMediaKindFromFileName(fileName);
+  const lower = content.toLowerCase();
+  if (lower.includes("image") || lower.includes("foto") || lower.includes("medya")) return "image";
+  if (lower.includes("audio") || lower.includes("ses")) return "audio";
+  if (lower.includes("video")) return "video";
+  if (lower.includes("document") || lower.includes("pdf")) return "document";
+  return isMedia(content) ? "unknown" : null;
 }
 
 function hasQuestion(content: string): boolean {
@@ -148,18 +175,25 @@ export function parseWhatsAppChat(rawText: string): ParsedChat {
     const prevSender = i > 0 ? rawMessages[i - 1].sender : null;
     const isReply = prevSender !== null && prevSender !== raw.sender;
 
+    const mediaFileName = isMedia(raw.content) ? extractMediaFileName(raw.content) : null;
+    const mediaType = getMediaType(raw.content, mediaFileName);
+
     messages.push({
       id: crypto.randomUUID(),
       timestamp: raw.timestamp,
       sender: raw.sender,
       content: raw.content,
-      is_media: isMedia(raw.content),
+      is_media: mediaType !== null,
+      media_file_name: mediaFileName,
+      media_type: mediaType,
       conversation_turn_index: turnIndex++,
       is_reply: isReply,
       message_length: raw.content.length,
       has_question: hasQuestion(raw.content),
     });
   }
+
+  const mediaItems = buildMediaItems(messages);
 
   // Build stats per sender
   const stats: ParsedChat["stats"] = {};
@@ -184,6 +218,8 @@ export function parseWhatsAppChat(rawText: string): ParsedChat {
   return {
     participants,
     messages,
+    media_items: mediaItems,
+    media_count: mediaItems.length,
     total_messages: messages.length,
     date_range: {
       start: new Date(Math.min(...timestamps.map((t) => t.getTime()))),
@@ -191,4 +227,34 @@ export function parseWhatsAppChat(rawText: string): ParsedChat {
     },
     stats,
   };
+}
+
+function buildMediaItems(messages: ParsedMessage[]): ParsedMediaItem[] {
+  return messages
+    .filter((message) => message.is_media)
+    .map((message) => {
+      const index = messages.findIndex((candidate) => candidate.id === message.id);
+      const before = messages
+        .slice(Math.max(0, index - 3), index)
+        .filter((candidate) => !candidate.is_media)
+        .map((candidate) => `${candidate.sender}: ${candidate.content}`)
+        .slice(-2);
+      const after = messages
+        .slice(index + 1, index + 4)
+        .filter((candidate) => !candidate.is_media)
+        .map((candidate) => `${candidate.sender}: ${candidate.content}`)
+        .slice(0, 2);
+
+      return {
+        id: crypto.randomUUID(),
+        message_id: message.id,
+        sender: message.sender,
+        timestamp: message.timestamp,
+        file_name: message.media_file_name,
+        media_type: message.media_type ?? "unknown",
+        content: message.content,
+        context_before: before,
+        context_after: after,
+      };
+    });
 }

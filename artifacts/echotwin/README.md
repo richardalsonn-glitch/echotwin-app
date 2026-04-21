@@ -50,3 +50,44 @@ AI_VOICE_OPENAI_TTS_VOICE=verse
 
 Run `SUPABASE_SETUP.sql` after pulling this change so the new columns and storage
 buckets exist.
+
+## Chat uploads with media
+
+The onboarding upload screen accepts both:
+
+- `.txt` WhatsApp exports without media
+- `.zip` WhatsApp exports with `_chat.txt` plus media files
+
+ZIP parsing is best-effort. The text chat is always parsed first. If individual
+media files cannot be matched or uploaded, the app keeps the text history and
+stores a warning in `parsed_data.parse_warnings`. Matched media references are
+stored in `parsed_data.media_memory` and uploaded to the `chat-media` bucket when
+they are within the configured limits.
+
+## Photo messages
+
+Users can send photos from the chat input. The photo is uploaded to Supabase
+Storage, saved as a user `image` message, analyzed by a vision model, and then
+the existing persona chat pipeline generates a normal text reply.
+
+The image analysis layer decides whether the photo is related to the current
+conversation, unrelated, or unclear. It also compares against recent uploaded
+chat-media memories when available, but only surfaces a memory hint when there is
+a strong enough match.
+
+Required env for image analysis:
+
+```bash
+AI_IMAGE_OPENROUTER_API_KEY=
+AI_IMAGE_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+AI_IMAGE_OPENROUTER_MODEL=openai/gpt-4o-mini
+```
+
+`AI_IMAGE_OPENROUTER_API_KEY` is optional when `OPENROUTER_API_KEY` is already
+set.
+
+## Media limits
+
+- Audio files: 50 MB
+- Photo files: 50 MB
+- Chat upload files (`.txt` or `.zip`): 50 MB

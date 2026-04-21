@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Upload, FileText, ArrowLeft, CheckCircle2, CloudUpload } from "lucide-react";
+import { FileArchive, FileText, ArrowLeft, CheckCircle2, CloudUpload, Images } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,8 +20,14 @@ export default function UploadPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   async function uploadFile(file: File) {
-    if (!file.name.endsWith(".txt")) {
-      toast.error("Yalnızca .txt dosyası kabul edilir");
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith(".txt") && !lowerName.endsWith(".zip")) {
+      toast.error("Yalnızca .txt veya .zip dosyası kabul edilir");
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("Dosya boyutu 50 MB'dan büyük olamaz");
       return;
     }
 
@@ -45,20 +51,24 @@ export default function UploadPage() {
       clearInterval(progressTimer);
       setProgress(100);
 
+      const data: unknown = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Yükleme başarısız");
+        throw new Error(getUploadError(data));
       }
 
-      const data = await res.json();
+      const payload = getObjectValue(data);
       setUploadState("success");
 
       setTimeout(() => {
         const url = new URL("/onboarding/select", window.location.origin);
-        url.searchParams.set("export_id", data.export_id);
-        url.searchParams.set("participants", JSON.stringify(data.participants));
-        if (data.stats) {
-          url.searchParams.set("stats", JSON.stringify(data.stats));
+        if (typeof payload.export_id === "string") {
+          url.searchParams.set("export_id", payload.export_id);
+        }
+        if (Array.isArray(payload.participants)) {
+          url.searchParams.set("participants", JSON.stringify(payload.participants));
+        }
+        if (payload.stats) {
+          url.searchParams.set("stats", JSON.stringify(payload.stats));
         }
         router.push(url.pathname + url.search);
       }, 800);
@@ -85,13 +95,15 @@ export default function UploadPage() {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) await uploadFile(file);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     },
     []
   );
 
+  const selectedIsZip = selectedFile?.name.toLowerCase().endsWith(".zip") ?? false;
+
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col ambient-bg">
-      {/* Header */}
       <div className="px-4 py-4 flex items-center gap-3 border-b border-white/5 bg-background/50 backdrop-blur-xl">
         <Link href="/home">
           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5">
@@ -104,7 +116,6 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* Step Indicator */}
       <div className="px-5 pt-5">
         <div className="flex items-center gap-2">
           <div className="h-1.5 w-1.5 rounded-full bg-primary" />
@@ -116,21 +127,19 @@ export default function UploadPage() {
       </div>
 
       <div className="flex-1 px-5 py-8 flex flex-col gap-7">
-        {/* Title */}
         <div>
           <h2 className="text-2xl font-bold mb-2 tracking-tight">Bir Sohbet Getir</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Onunla konuştuğun WhatsApp sohbetini dışa aktar ve buraya yükle
+            WhatsApp sohbetini medyalı ya da medyasız dışa aktar ve buraya yükle.
           </p>
         </div>
 
-        {/* Instructions */}
         <div className="bg-card/60 border border-border/40 rounded-2xl p-5 space-y-3">
           <p className="font-semibold text-sm text-foreground/80 mb-1">Nasıl dışa aktarılır?</p>
           {[
             "WhatsApp'ta kişiyle sohbeti aç",
-            "Üç nokta → Daha fazla → Sohbeti Dışa Aktar",
-            '"Medya olmadan" seç ve .txt dosyasını yükle',
+            "Üç nokta -> Daha fazla -> Sohbeti Dışa Aktar",
+            "Medya olmadan seçersen .txt, medyayı dahil edersen .zip yükle",
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-3">
               <span className="flex-shrink-0 h-5 w-5 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
@@ -139,9 +148,20 @@ export default function UploadPage() {
               <span className="text-sm text-muted-foreground leading-relaxed">{step}</span>
             </div>
           ))}
+          <div className="pt-2 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-white/5 border border-white/8 p-3">
+              <FileText className="h-4 w-4 text-primary mb-2" />
+              <p className="text-xs font-semibold text-foreground/80">Medyasız</p>
+              <p className="text-[11px] text-muted-foreground/60 mt-0.5">.txt sohbet geçmişi</p>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/8 p-3">
+              <Images className="h-4 w-4 text-primary mb-2" />
+              <p className="text-xs font-semibold text-foreground/80">Medyalı</p>
+              <p className="text-[11px] text-muted-foreground/60 mt-0.5">.zip + medya hafızası</p>
+            </div>
+          </div>
         </div>
 
-        {/* Drop Zone / Status */}
         <AnimatePresence mode="wait">
           {uploadState === "idle" && (
             <motion.div
@@ -168,12 +188,12 @@ export default function UploadPage() {
               <p className="font-semibold text-sm mb-1">Dosyayı buraya sürükle</p>
               <p className="text-xs text-muted-foreground mb-4">veya seçmek için tıkla</p>
               <span className="text-[11px] text-muted-foreground/60 bg-muted/30 px-3 py-1 rounded-full">
-                Yalnızca .txt — Maks. 50MB
+                .txt veya .zip - Maks. 50MB
               </span>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".txt"
+                accept=".txt,.zip"
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -190,17 +210,23 @@ export default function UploadPage() {
             >
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                  <FileText className="h-6 w-6 text-primary" />
+                  {selectedIsZip ? (
+                    <FileArchive className="h-6 w-6 text-primary" />
+                  ) : (
+                    <FileText className="h-6 w-6 text-primary" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate">{selectedFile?.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Mesajlar okunuyor...</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Mesajlar ve medya referansları okunuyor...
+                  </p>
                 </div>
               </div>
               <div className="space-y-2">
                 <Progress value={progress} className="h-1.5 bg-muted/50" />
                 <p className="text-xs text-muted-foreground text-center">
-                  Katılımcılar belirleniyor — lütfen bekle
+                  Katılımcılar belirleniyor - lütfen bekle
                 </p>
               </div>
             </motion.div>
@@ -226,4 +252,15 @@ export default function UploadPage() {
       </div>
     </div>
   );
+}
+
+function getObjectValue(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+function getUploadError(value: unknown): string {
+  const data = getObjectValue(value);
+  return typeof data.error === "string" && data.error.trim()
+    ? data.error.trim()
+    : "Yükleme başarısız";
 }

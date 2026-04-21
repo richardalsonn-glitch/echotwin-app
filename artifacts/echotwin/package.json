@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.0",
+    "jszip": "^3.10.1",
     "next": "^15.3.4",
     "openai": "^4.104.0",
     "react": "catalog:",

@@ -100,10 +100,14 @@ create table if not exists public.messages (
   user_id uuid references auth.users(id) on delete cascade not null,
   role text not null check (role in ('user', 'assistant')),
   content text not null,
-  message_type text not null default 'text' check (message_type in ('text', 'voice')),
+  message_type text not null default 'text' check (message_type in ('text', 'voice', 'image')),
   audio_url text,
+  image_url text,
   audio_duration_seconds integer,
   voice_provider text,
+  media_mime_type text,
+  media_size_bytes integer,
+  media_metadata jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -126,8 +130,18 @@ alter table public.personas
 alter table public.messages
   add column if not exists message_type text not null default 'text',
   add column if not exists audio_url text,
+  add column if not exists image_url text,
   add column if not exists audio_duration_seconds integer,
-  add column if not exists voice_provider text;
+  add column if not exists voice_provider text,
+  add column if not exists media_mime_type text,
+  add column if not exists media_size_bytes integer,
+  add column if not exists media_metadata jsonb;
+
+alter table public.messages
+  drop constraint if exists messages_message_type_check;
+
+alter table public.messages
+  add constraint messages_message_type_check check (message_type in ('text', 'voice', 'image'));
 
 -- 6. Auto-create user_profile on signup
 create or replace function public.handle_new_user()
@@ -201,10 +215,16 @@ values (
   'voice-samples',
   'voice-samples',
   false,
-  15728640,
+  52428800,
   array['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/x-m4a']
 )
 on conflict (id) do nothing;
+
+update storage.buckets
+set
+  file_size_limit = 52428800,
+  allowed_mime_types = array['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/x-m4a']
+where id = 'voice-samples';
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -215,6 +235,30 @@ values (
   array['audio/mpeg', 'audio/mp3']
 )
 on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'chat-media',
+  'chat-media',
+  true,
+  52428800,
+  array[
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
+    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/mp4',
+    'video/mp4', 'video/quicktime', 'application/pdf'
+  ]
+)
+on conflict (id) do nothing;
+
+update storage.buckets
+set
+  file_size_limit = 52428800,
+  allowed_mime_types = array[
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
+    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/mp4',
+    'video/mp4', 'video/quicktime', 'application/pdf'
+  ]
+where id = 'chat-media';
 
 drop policy if exists "Users can upload own voice samples" on storage.objects;
 create policy "Users can upload own voice samples"
@@ -252,6 +296,19 @@ drop policy if exists "Voice messages are publicly viewable" on storage.objects;
 create policy "Voice messages are publicly viewable"
   on storage.objects for select
   using (bucket_id = 'voice-messages');
+
+drop policy if exists "Users can upload own chat media" on storage.objects;
+create policy "Users can upload own chat media"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'chat-media'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "Chat media is publicly viewable" on storage.objects;
+create policy "Chat media is publicly viewable"
+  on storage.objects for select
+  using (bucket_id = 'chat-media');
 
 -- ========================================================
 -- DONE! Tabloları kontrol et:

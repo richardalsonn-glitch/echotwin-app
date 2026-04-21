@@ -60,7 +60,7 @@ export interface VoiceProfileMetadata {
   duration_estimate_seconds: number | null;
 }
 
-export type ChatMessageType = "text" | "voice";
+export type ChatMessageType = "text" | "voice" | "image";
 
 export interface ChatMessage {
   id: string;
@@ -70,7 +70,11 @@ export interface ChatMessage {
   content: string;
   message_type: ChatMessageType;
   audio_url: string | null;
+  image_url: string | null;
   audio_duration_seconds: number | null;
   voice_provider: string | null;
+  media_mime_type: string | null;
+  media_size_bytes: number | null;
+  media_metadata: Record<string, unknown> | null;
   created_at: string;
 }

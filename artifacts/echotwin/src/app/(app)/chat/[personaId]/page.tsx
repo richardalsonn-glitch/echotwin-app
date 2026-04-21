@@ -20,6 +20,7 @@ import {
   Play,
   Pause,
   AudioLines,
+  ImagePlus,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,6 +38,7 @@ import {
   stopAudioRecording,
   type AudioRecorderSession,
 } from "@/lib/audio/recorder";
+import { validateImageFile } from "@/lib/media/limits";
 import {
   clearUnread,
   incrementUnread,
@@ -53,6 +55,7 @@ const FREE_LIMIT = 5;
 type MessageStatus = "sent" | "delivered" | "read";
 type PresenceState = "idle" | "online" | "typing" | "recent_online";
 type VoiceInputStatus = "idle" | "recording" | "transcribing";
+type PhotoInputStatus = "idle" | "uploading";
 
 interface DisplayMessage extends ChatMessage {
   status?: MessageStatus;
@@ -147,10 +150,45 @@ function getVoiceMessageFromValue(value: unknown, personaId: string): DisplayMes
     content,
     message_type: "voice",
     audio_url: audioUrl,
+    image_url: null,
     audio_duration_seconds:
       typeof data.audio_duration_seconds === "number" ? data.audio_duration_seconds : null,
     voice_provider: typeof data.voice_provider === "string" ? data.voice_provider : null,
+    media_mime_type: typeof data.media_mime_type === "string" ? data.media_mime_type : null,
+    media_size_bytes: typeof data.media_size_bytes === "number" ? data.media_size_bytes : null,
+    media_metadata: null,
     created_at: typeof data.created_at === "string" ? data.created_at : new Date().toISOString(),
+  };
+}
+
+function getDisplayMessageFromValue(value: unknown, personaId: string): DisplayMessage | null {
+  const data = getObjectValue(value);
+  const role = data.role === "user" || data.role === "assistant" ? data.role : null;
+  const content = typeof data.content === "string" ? data.content : "";
+  const messageType =
+    data.message_type === "voice" || data.message_type === "image" || data.message_type === "text"
+      ? data.message_type
+      : "text";
+
+  if (!role || !content.trim()) return null;
+
+  return {
+    id: typeof data.id === "string" ? data.id : `msg-${Date.now()}`,
+    persona_id: typeof data.persona_id === "string" ? data.persona_id : personaId,
+    user_id: typeof data.user_id === "string" ? data.user_id : "",
+    role,
+    content,
+    message_type: messageType,
+    audio_url: typeof data.audio_url === "string" ? data.audio_url : null,
+    image_url: typeof data.image_url === "string" ? data.image_url : null,
+    audio_duration_seconds:
+      typeof data.audio_duration_seconds === "number" ? data.audio_duration_seconds : null,
+    voice_provider: typeof data.voice_provider === "string" ? data.voice_provider : null,
+    media_mime_type: typeof data.media_mime_type === "string" ? data.media_mime_type : null,
+    media_size_bytes: typeof data.media_size_bytes === "number" ? data.media_size_bytes : null,
+    media_metadata: null,
+    created_at: typeof data.created_at === "string" ? data.created_at : new Date().toISOString(),
+    status: role === "user" ? "read" : undefined,
   };
 }
 
@@ -163,6 +201,7 @@ export default function ChatPage({
   const router = useRouter();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const presenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduledTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const recordingSessionRef = useRef<AudioRecorderSession | null>(null);
@@ -185,6 +224,7 @@ export default function ChatPage({
   const [mounted, setMounted] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>("idle");
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [photoStatus, setPhotoStatus] = useState<PhotoInputStatus>("idle");
   const [playingVoiceMessageId, setPlayingVoiceMessageId] = useState<string | null>(null);
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -261,8 +301,12 @@ export default function ChatPage({
             content: data.message.content,
             message_type: serverMsg.message_type ?? "text",
             audio_url: serverMsg.audio_url ?? null,
+            image_url: serverMsg.image_url ?? null,
             audio_duration_seconds: serverMsg.audio_duration_seconds ?? null,
             voice_provider: serverMsg.voice_provider ?? null,
+            media_mime_type: serverMsg.media_mime_type ?? null,
+            media_size_bytes: serverMsg.media_size_bytes ?? null,
+            media_metadata: serverMsg.media_metadata ?? null,
             created_at: serverMsg.created_at ?? new Date().toISOString(),
           };
           setMessages((prev) => [...prev, idleMsg]);
@@ -345,8 +389,12 @@ export default function ChatPage({
           content: m.content,
           message_type: m.message_type ?? "text",
           audio_url: m.audio_url ?? null,
+          image_url: m.image_url ?? null,
           audio_duration_seconds: m.audio_duration_seconds ?? null,
           voice_provider: m.voice_provider ?? null,
+          media_mime_type: m.media_mime_type ?? null,
+          media_size_bytes: m.media_size_bytes ?? null,
+          media_metadata: m.media_metadata ?? null,
           created_at: m.created_at ?? new Date().toISOString(),
         })
       );
@@ -621,6 +669,99 @@ export default function ChatPage({
     }
   }
 
+  async function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    if (!file || sending || limitReached || photoStatus !== "idle") return;
+    await sendPhotoMessage(file);
+  }
+
+  async function sendPhotoMessage(file: File) {
+    const validation = validateImageFile(file);
+    if (!validation.ok) {
+      toast.error(validation.userMessage);
+      return;
+    }
+
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+
+    const caption = input.trim();
+    setInput("");
+    setSending(true);
+    setPhotoStatus("uploading");
+    setPresence("online");
+
+    try {
+      const formData = new FormData();
+      formData.append("persona_id", personaId);
+      formData.append("image", file);
+      if (caption) formData.append("caption", caption);
+
+      const res = await fetch("/api/chat/photo", {
+        method: "POST",
+        body: formData,
+      });
+      const data: unknown = await res.json().catch(() => ({}));
+      const payload = getObjectValue(data);
+
+      if (!res.ok) {
+        if (payload.limit_reached) setLimitReached(true);
+        toast.error(typeof payload.error === "string" ? payload.error : "Fotograf gonderilemedi");
+        return;
+      }
+
+      const userMessage = getDisplayMessageFromValue(payload.user_message, personaId);
+      const assistantMessage = getDisplayMessageFromValue(payload.assistant_message, personaId);
+      if (userMessage || assistantMessage) {
+        setMessages((prev) => [
+          ...prev,
+          ...(userMessage ? [userMessage] : []),
+          ...(assistantMessage ? [assistantMessage] : []),
+        ]);
+      }
+
+      if (typeof payload.message_count_used === "number") {
+        setPersona((p) =>
+          p ? { ...p, message_count_used: payload.message_count_used as number } : p
+        );
+        if (payload.message_count_used >= FREE_LIMIT) void checkLimit();
+      }
+
+      if (assistantMessage) {
+        onResponseDelivered(
+          assistantMessage.content,
+          persona?.display_name ?? "AI",
+          persona?.avatar_url ?? undefined
+        );
+        if (
+          payload.voice_message_pending === true &&
+          typeof payload.message_count_used === "number"
+        ) {
+          void requestVoiceMessage(assistantMessage.content, payload.message_count_used);
+        }
+      }
+
+      setPresence("recent_online");
+      const seenTime = new Date();
+      clearPresenceTimer();
+      presenceTimerRef.current = setTimeout(() => {
+        setLastSeenAt(seenTime);
+        setPresence("idle");
+      }, 4000);
+    } catch (error) {
+      console.warn("[chat-photo] send failed", error);
+      toast.error("Fotograf gonderilemedi, tekrar dene");
+      setPresence("idle");
+    } finally {
+      setSending(false);
+      setPhotoStatus("idle");
+      inputRef.current?.focus();
+    }
+  }
+
   async function sendMessage(messageOverride?: string) {
     const content = (messageOverride ?? input).trim();
     if (!content || sending || limitReached) return;
@@ -644,8 +785,12 @@ export default function ChatPage({
       content,
       message_type: "text",
       audio_url: null,
+      image_url: null,
       audio_duration_seconds: null,
       voice_provider: null,
+      media_mime_type: null,
+      media_size_bytes: null,
+      media_metadata: null,
       created_at: new Date().toISOString(),
       status: "sent",
     };
@@ -734,8 +879,12 @@ export default function ChatPage({
                   content: event.content,
                   message_type: "text",
                   audio_url: null,
+                  image_url: null,
                   audio_duration_seconds: null,
                   voice_provider: null,
+                  media_mime_type: null,
+                  media_size_bytes: null,
+                  media_metadata: null,
                   created_at: new Date().toISOString(),
                 };
                 setMessages((prev) => [...prev, partMsg]);
@@ -781,8 +930,12 @@ export default function ChatPage({
                       content: part,
                       message_type: "text",
                       audio_url: null,
+                      image_url: null,
                       audio_duration_seconds: null,
                       voice_provider: null,
+                      media_mime_type: null,
+                      media_size_bytes: null,
+                      media_metadata: null,
                       created_at: new Date().toISOString(),
                     };
                     setMessages((prev) => [...prev, newMsg]);
@@ -842,8 +995,12 @@ export default function ChatPage({
                     content: deliveredText,
                     message_type: "text",
                     audio_url: null,
+                    image_url: null,
                     audio_duration_seconds: null,
                     voice_provider: null,
+                    media_mime_type: null,
+                    media_size_bytes: null,
+                    media_metadata: null,
                     created_at: new Date().toISOString(),
                   },
                 ];
@@ -946,12 +1103,15 @@ export default function ChatPage({
     presence === "recent_online" ||
     presence === "typing";
   const voiceStatusText =
-    voiceStatus === "recording"
+    photoStatus === "uploading"
+      ? "Fotoğraf yükleniyor..."
+      : voiceStatus === "recording"
       ? "Dinliyorum..."
       : voiceStatus === "transcribing"
       ? "Ses çözümleniyor..."
       : voiceError;
-  const textSendDisabled = !input.trim() || sending || voiceStatus !== "idle";
+  const textSendDisabled =
+    !input.trim() || sending || voiceStatus !== "idle" || photoStatus !== "idle";
 
   return (
     <div className="max-w-md mx-auto flex flex-col h-screen" style={{ background: "#0B1220" }}>
@@ -1087,6 +1247,7 @@ export default function ChatPage({
             const sameAsPrev = index > 0 && messages[index - 1].role === msg.role;
             const sameAsNext = index < messages.length - 1 && messages[index + 1].role === msg.role;
             const isVoiceMessage = !isUser && msg.message_type === "voice" && Boolean(msg.audio_url);
+            const isImageMessage = msg.message_type === "image" && Boolean(msg.image_url);
             const isPlayingVoice = playingVoiceMessageId === msg.id;
 
             return (
@@ -1117,7 +1278,11 @@ export default function ChatPage({
 
                 <div
                   className={`max-w-[76%] ${isUser ? "bubble-sent" : "bubble-received"} ${
-                    isVoiceMessage ? "px-3 py-2.5 min-w-[210px]" : "px-3.5 py-2"
+                    isVoiceMessage
+                      ? "px-3 py-2.5 min-w-[210px]"
+                      : isImageMessage
+                      ? "p-1.5 min-w-[190px]"
+                      : "px-3.5 py-2"
                   }`}
                   style={
                     isUser
@@ -1125,7 +1290,21 @@ export default function ChatPage({
                       : { borderRadius: sameAsPrev ? "5px 18px 18px 5px" : sameAsNext ? "5px 18px 18px 18px" : undefined }
                   }
                 >
-                  {isVoiceMessage ? (
+                  {isImageMessage ? (
+                    <div className="space-y-1.5">
+                      <img
+                        src={msg.image_url ?? ""}
+                        alt="Gönderilen fotoğraf"
+                        className="max-h-72 w-full rounded-[14px] object-cover"
+                        loading="lazy"
+                      />
+                      {msg.content && msg.content !== "Fotograf gonderildi" && (
+                        <p className="px-1 text-[13px] leading-[1.4] whitespace-pre-wrap break-words">
+                          {msg.content}
+                        </p>
+                      )}
+                    </div>
+                  ) : isVoiceMessage ? (
                     <div className="flex items-center gap-2.5">
                       <button
                         type="button"
@@ -1311,14 +1490,42 @@ export default function ChatPage({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    if (voiceStatus === "idle") void sendMessage();
+                    if (voiceStatus === "idle" && photoStatus === "idle") void sendMessage();
                   }
                 }}
                 disabled={sending}
                 className="rounded-3xl h-11 px-4 text-[14px] text-white border-0 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-offset-0 placeholder:text-white/25"
                 style={{ background: "rgba(255,255,255,0.07)" }}
               />
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => void handlePhotoPick(e)}
+              />
             </div>
+            <button
+              type="button"
+              aria-label="Fotoğraf gönder"
+              title="Fotoğraf gönder"
+              className="h-11 w-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 disabled:opacity-40"
+              style={{
+                background:
+                  photoStatus === "uploading"
+                    ? "rgba(20,184,166,0.12)"
+                    : "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}
+              onClick={() => photoInputRef.current?.click()}
+              disabled={sending || voiceStatus !== "idle" || photoStatus === "uploading"}
+            >
+              {photoStatus === "uploading" ? (
+                <Loader2 className="h-4 w-4 text-primary animate-spin" />
+              ) : (
+                <ImagePlus className="h-4 w-4 text-white/75" />
+              )}
+            </button>
             <button
               type="button"
               aria-label={voiceStatus === "recording" ? "Kaydı bitir" : "Sesli mesaj kaydet"}
@@ -1341,7 +1548,7 @@ export default function ChatPage({
                     : "none",
               }}
               onClick={() => void handleVoiceButtonClick()}
-              disabled={sending || voiceStatus === "transcribing"}
+              disabled={sending || photoStatus === "uploading" || voiceStatus === "transcribing"}
             >
               {voiceStatus === "transcribing" ? (
                 <Loader2 className="h-4 w-4 text-primary animate-spin" />
