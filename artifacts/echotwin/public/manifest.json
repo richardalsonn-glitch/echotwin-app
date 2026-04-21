@@ -1,0 +1,17 @@
+{
+  "name": "Bendeki Sen",
+  "short_name": "Bendeki Sen",
+  "description": "Gecmis sohbetlerden kisisel bir yapay zeka sohbet deneyimi.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080e1c",
+  "theme_color": "#080e1c",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -24,7 +24,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { createClient } from "@/lib/supabase/client";
+import {
+  createClient,
+  hasSupabaseBrowserConfig,
+} from "@/lib/supabase/client";
 import {
   areBrowserNotificationsEnabled,
   requestNotificationPermission,
@@ -81,15 +84,29 @@ export function AppMenu({
   const [notificationsSupported, setNotificationsSupported] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
     let mounted = true;
 
     setNotificationsSupported(typeof window !== "undefined" && "Notification" in window);
     setNotificationsOn(areBrowserNotificationsEnabled());
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setIsAuthenticated(Boolean(data.session));
-    });
+    if (!hasSupabaseBrowserConfig()) {
+      setIsAuthenticated(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    const supabase = createClient();
+
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (mounted) setIsAuthenticated(Boolean(data.session));
+      })
+      .catch((error: unknown) => {
+        console.error("App menu auth session check failed:", error);
+        if (mounted) setIsAuthenticated(false);
+      });
 
     const {
       data: { subscription },
@@ -109,6 +126,11 @@ export function AppMenu({
   }
 
   async function handleLogout() {
+    if (!hasSupabaseBrowserConfig()) {
+      toast.error("Oturum servisi su an yapilandirilmamis.");
+      return;
+    }
+
     const supabase = createClient();
     await supabase.auth.signOut();
     setIsAuthenticated(false);
