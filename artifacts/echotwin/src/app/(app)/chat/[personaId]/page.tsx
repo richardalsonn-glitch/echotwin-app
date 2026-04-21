@@ -423,6 +423,22 @@ export default function ChatPage({
     setRecordingElapsedMs(0);
   }
 
+  function resetVoiceInputAfterError(message: string) {
+    clearRecordingTimeout();
+    clearRecordingInterval();
+    stopLevelMeter();
+
+    if (recordingSessionRef.current) {
+      discardAudioRecording(recordingSessionRef.current);
+      recordingSessionRef.current = null;
+    }
+
+    clearVoicePreview();
+    setVoiceStatus("idle");
+    setRecordingElapsedMs(0);
+    setVoiceError(message);
+  }
+
   useEffect(() => {
     return () => {
       if (voicePreview?.url) URL.revokeObjectURL(voicePreview.url);
@@ -704,10 +720,7 @@ export default function ChatPage({
     } catch (error) {
       const message = getAudioRecorderUserMessage(error);
       console.warn("[voice-input] recording failed", error);
-      clearRecordingInterval();
-      stopLevelMeter();
-      setVoiceStatus("idle");
-      setVoiceError(message);
+      resetVoiceInputAfterError(message);
       toast.error(message);
     }
   }
@@ -746,14 +759,11 @@ export default function ChatPage({
       setVoiceStatus("preview");
     } catch (error) {
       console.warn("[voice-input] recording preview failed", error);
-      recordingSessionRef.current = null;
-      setVoiceStatus("idle");
-      setRecordingElapsedMs(0);
       const rawMessage = error instanceof Error ? error.message : "";
       const message = rawMessage.startsWith("Ses ")
         ? rawMessage
         : "Ses mesajı okunamadı, tekrar dene";
-      setVoiceError(message);
+      resetVoiceInputAfterError(message);
       toast.error(message);
     }
   }
@@ -798,12 +808,11 @@ export default function ChatPage({
       await sendMessage(transcript);
     } catch (error) {
       console.warn("[voice-input] transcription failed", error);
-      setVoiceStatus("preview");
       const rawMessage = error instanceof Error ? error.message : "";
       const message = rawMessage.startsWith("Ses ")
         ? rawMessage
         : "Ses mesajı okunamadı, tekrar dene";
-      setVoiceError(message);
+      resetVoiceInputAfterError(message);
       toast.error(message);
     }
   }
