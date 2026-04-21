@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: "Bendeki Sen — Sanki hâlâ karşındaymış gibi",
   description: "WhatsApp sohbet geçmişinden yapay zeka kişiliği oluştur, sanki o hâlâ karşındaymış gibi konuş.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
