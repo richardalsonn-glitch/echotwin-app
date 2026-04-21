@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
+  Menu,
   MoreVertical,
   Trash2,
   User,
@@ -253,11 +254,25 @@ export default function HomePage() {
         <span className="text-[13px] font-semibold gradient-text tracking-wide">Bendeki Sen</span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="h-8 w-8 rounded-full flex items-center justify-center border border-white/8 bg-white/5 hover:bg-white/10 transition-colors">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
+            <button
+              className="h-9 rounded-full px-3 flex items-center gap-2 border border-white/8 bg-white/5 hover:bg-white/10 transition-colors text-xs font-semibold text-foreground/80"
+              aria-label="Menüyü aç"
+              type="button"
+            >
+              <Menu className="h-3.5 w-3.5 text-primary" />
+              Menü
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-card border-border/60 rounded-2xl shadow-2xl w-52 p-1">
+            <DropdownMenuItem onClick={() => router.push("/onboarding/upload")} className="rounded-xl gap-2.5 text-sm py-2.5">
+              <Plus className="h-4 w-4 text-primary" />
+              Yeni Kişi Ekle
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/upgrade")} className="rounded-xl gap-2.5 text-sm py-2.5">
+              <Crown className="h-4 w-4 text-amber-400" />
+              Üyelik / Planlar
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-border/40 my-1" />
             <DropdownMenuItem onClick={toggleSound} className="rounded-xl gap-2.5 text-sm py-2.5">
               {soundOn ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4" />}
               {soundOn ? "Ses Açık" : "Ses Kapalı"}
@@ -607,7 +622,7 @@ export default function HomePage() {
 
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                  <button className="h-6 w-6 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-white/8">
+                                  <button className="h-7 w-7 rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center text-muted-foreground/70 hover:text-foreground hover:bg-white/8">
                                     <MoreVertical className="h-3.5 w-3.5" />
                                   </button>
                                 </DropdownMenuTrigger>
