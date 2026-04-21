@@ -16,14 +16,17 @@ create table if not exists public.user_profiles (
 
 alter table public.user_profiles enable row level security;
 
+drop policy if exists "Users can view own profile" on public.user_profiles;
 create policy "Users can view own profile"
   on public.user_profiles for select
   using (auth.uid() = id);
 
+drop policy if exists "Users can update own profile" on public.user_profiles;
 create policy "Users can update own profile"
   on public.user_profiles for update
   using (auth.uid() = id);
 
+drop policy if exists "Users can insert own profile" on public.user_profiles;
 create policy "Users can insert own profile"
   on public.user_profiles for insert
   with check (auth.uid() = id);
@@ -41,6 +44,7 @@ create table if not exists public.chat_exports (
 
 alter table public.chat_exports enable row level security;
 
+drop policy if exists "Users can manage own chat exports" on public.chat_exports;
 create policy "Users can manage own chat exports"
   on public.chat_exports for all
   using (auth.uid() = user_id);
@@ -56,6 +60,7 @@ create table if not exists public.chat_messages_cache (
 
 alter table public.chat_messages_cache enable row level security;
 
+drop policy if exists "Users can manage own message cache" on public.chat_messages_cache;
 create policy "Users can manage own message cache"
   on public.chat_messages_cache for all
   using (auth.uid() = user_id);
@@ -83,6 +88,7 @@ create table if not exists public.personas (
 
 alter table public.personas enable row level security;
 
+drop policy if exists "Users can manage own personas" on public.personas;
 create policy "Users can manage own personas"
   on public.personas for all
   using (auth.uid() = user_id);
@@ -103,6 +109,7 @@ create table if not exists public.messages (
 
 alter table public.messages enable row level security;
 
+drop policy if exists "Users can manage own messages" on public.messages;
 create policy "Users can manage own messages"
   on public.messages for all
   using (auth.uid() = user_id);
@@ -138,6 +145,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
@@ -152,11 +160,13 @@ values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
 
 -- Public read access
+drop policy if exists "Avatars are publicly viewable" on storage.objects;
 create policy "Avatars are publicly viewable"
   on storage.objects for select
   using (bucket_id = 'avatars');
 
 -- Authenticated users can upload to their own folder
+drop policy if exists "Users can upload own avatars" on storage.objects;
 create policy "Users can upload own avatars"
   on storage.objects for insert
   with check (
@@ -165,6 +175,7 @@ create policy "Users can upload own avatars"
   );
 
 -- Authenticated users can update their own avatars
+drop policy if exists "Users can update own avatars" on storage.objects;
 create policy "Users can update own avatars"
   on storage.objects for update
   using (
@@ -173,6 +184,7 @@ create policy "Users can update own avatars"
   );
 
 -- Authenticated users can delete their own avatars
+drop policy if exists "Users can delete own avatars" on storage.objects;
 create policy "Users can delete own avatars"
   on storage.objects for delete
   using (
@@ -204,6 +216,7 @@ values (
 )
 on conflict (id) do nothing;
 
+drop policy if exists "Users can upload own voice samples" on storage.objects;
 create policy "Users can upload own voice samples"
   on storage.objects for insert
   with check (
@@ -211,6 +224,7 @@ create policy "Users can upload own voice samples"
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Users can read own voice samples" on storage.objects;
 create policy "Users can read own voice samples"
   on storage.objects for select
   using (
@@ -218,6 +232,7 @@ create policy "Users can read own voice samples"
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Users can update own voice samples" on storage.objects;
 create policy "Users can update own voice samples"
   on storage.objects for update
   using (
@@ -225,6 +240,7 @@ create policy "Users can update own voice samples"
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Users can upload own voice messages" on storage.objects;
 create policy "Users can upload own voice messages"
   on storage.objects for insert
   with check (
@@ -232,6 +248,7 @@ create policy "Users can upload own voice messages"
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
 
+drop policy if exists "Voice messages are publicly viewable" on storage.objects;
 create policy "Voice messages are publicly viewable"
   on storage.objects for select
   using (bucket_id = 'voice-messages');
