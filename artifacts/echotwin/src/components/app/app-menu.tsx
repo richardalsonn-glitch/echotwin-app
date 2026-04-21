@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
+  Bell,
+  BellOff,
   ChevronRight,
   CircleHelp,
   Crown,
@@ -13,6 +15,7 @@ import {
   MessageCircle,
   Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Sheet,
   SheetContent,
@@ -22,6 +25,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { createClient } from "@/lib/supabase/client";
+import {
+  areBrowserNotificationsEnabled,
+  requestNotificationPermission,
+  setBrowserNotificationsEnabled,
+} from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 
 type AppMenuProps = {
@@ -69,10 +77,15 @@ export function AppMenu({
   const currentPath = pathname ?? "";
   const [open, setOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuthenticated);
+  const [notificationsOn, setNotificationsOn] = useState(false);
+  const [notificationsSupported, setNotificationsSupported] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
     let mounted = true;
+
+    setNotificationsSupported(typeof window !== "undefined" && "Notification" in window);
+    setNotificationsOn(areBrowserNotificationsEnabled());
 
     void supabase.auth.getSession().then(({ data }) => {
       if (mounted) setIsAuthenticated(Boolean(data.session));
@@ -102,6 +115,24 @@ export function AppMenu({
     setOpen(false);
     router.push("/login");
     router.refresh();
+  }
+
+  async function handleToggleNotifications() {
+    if (notificationsOn) {
+      setBrowserNotificationsEnabled(false);
+      setNotificationsOn(false);
+      toast.success("Bildirimler kapalı");
+      return;
+    }
+
+    const granted = await requestNotificationPermission();
+    setNotificationsOn(granted);
+
+    if (granted) {
+      toast.success("Bildirimler açık");
+    } else {
+      toast.error("Bildirim izni verilmedi. Tarayıcı ayarlarından açabilirsin.");
+    }
   }
 
   const authTitle = isAuthenticated ? "Hesabın açık" : "Hesabınla devam et";
@@ -195,6 +226,27 @@ export function AppMenu({
           </nav>
 
           <div className="border-t border-white/8 bg-black/18 p-4">
+            <button
+              type="button"
+              onClick={handleToggleNotifications}
+              disabled={!notificationsSupported}
+              className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 text-left transition-colors hover:border-primary/20 hover:bg-primary/[0.07] disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.04] text-primary">
+                {notificationsOn ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-white/86">
+                  {notificationsOn ? "Bildirimler Açık" : "Bildirimler Kapalı"}
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-white/42">
+                  {notificationsSupported
+                    ? "Yeni mesaj uyarılarını buradan yönet."
+                    : "Bu tarayıcı bildirimleri desteklemiyor."}
+                </span>
+              </span>
+            </button>
+
             <div className="mb-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
               <p className="text-sm font-semibold text-white/86">{authTitle}</p>
               <p className="mt-1 text-xs leading-relaxed text-white/42">{authDescription}</p>

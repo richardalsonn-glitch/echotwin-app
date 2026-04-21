@@ -7,6 +7,7 @@ const SOUND_KEY = "echotwin_sound_enabled";
 const UNREAD_KEY = (id: string) => `echotwin_unread_${id}`;
 const LASTMSG_KEY = (id: string) => `echotwin_lastmsg_${id}`;
 const NOTIF_ASKED_KEY = "echotwin_notif_asked";
+const NOTIFICATION_ENABLED_KEY = "echotwin_browser_notifications_enabled";
 
 /* ─── Sound ─────────────────────────────────────────────── */
 
@@ -73,14 +74,37 @@ export function playNotificationSound(type: "incoming" | "soft" = "incoming") {
 export async function requestNotificationPermission(): Promise<boolean> {
   if (typeof window === "undefined" || !("Notification" in window))
     return false;
-  if (Notification.permission === "granted") return true;
-  if (Notification.permission === "denied") return false;
+  if (Notification.permission === "granted") {
+    setBrowserNotificationsEnabled(true);
+    return true;
+  }
+  if (Notification.permission === "denied") {
+    setBrowserNotificationsEnabled(false);
+    return false;
+  }
   // Only ask once
   if (localStorage.getItem(NOTIF_ASKED_KEY) === "declined") return false;
   localStorage.setItem(NOTIF_ASKED_KEY, "asked");
   const result = await Notification.requestPermission();
-  if (result === "denied") localStorage.setItem(NOTIF_ASKED_KEY, "declined");
-  return result === "granted";
+  if (result === "denied") {
+    localStorage.setItem(NOTIF_ASKED_KEY, "declined");
+    setBrowserNotificationsEnabled(false);
+    return false;
+  }
+  const granted = result === "granted";
+  setBrowserNotificationsEnabled(granted);
+  return granted;
+}
+
+export function areBrowserNotificationsEnabled(): boolean {
+  if (typeof window === "undefined" || !("Notification" in window)) return false;
+  if (Notification.permission !== "granted") return false;
+  return localStorage.getItem(NOTIFICATION_ENABLED_KEY) !== "false";
+}
+
+export function setBrowserNotificationsEnabled(enabled: boolean) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(NOTIFICATION_ENABLED_KEY, String(enabled));
 }
 
 export function showBrowserNotification(
@@ -89,7 +113,7 @@ export function showBrowserNotification(
   iconUrl?: string
 ) {
   if (typeof window === "undefined" || !("Notification" in window)) return;
-  if (Notification.permission !== "granted") return;
+  if (!areBrowserNotificationsEnabled()) return;
   try {
     new Notification(title, {
       body,
