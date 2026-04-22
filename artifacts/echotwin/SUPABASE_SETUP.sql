@@ -75,6 +75,12 @@ create table if not exists public.personas (
   display_name text not null,
   avatar_url text,
   analysis jsonb,
+  analysis_status text not null default 'queued' check (analysis_status in ('queued', 'processing', 'retrying', 'completed', 'completed_basic', 'failed')),
+  analysis_error_code text,
+  analysis_provider text,
+  analysis_attempt_count integer not null default 0,
+  analysis_completed_at timestamptz,
+  analysis_summary_cache jsonb,
   message_count_used integer not null default 0,
   voice_sample_url text,
   voice_profile_status text not null default 'none' check (voice_profile_status in ('none', 'processing', 'ready', 'failed')),
@@ -120,6 +126,12 @@ create policy "Users can manage own messages"
 
 -- 5b. Voice profile / voice message columns for existing installs
 alter table public.personas
+  add column if not exists analysis_status text not null default 'queued',
+  add column if not exists analysis_error_code text,
+  add column if not exists analysis_provider text,
+  add column if not exists analysis_attempt_count integer not null default 0,
+  add column if not exists analysis_completed_at timestamptz,
+  add column if not exists analysis_summary_cache jsonb,
   add column if not exists voice_sample_url text,
   add column if not exists voice_profile_status text not null default 'none',
   add column if not exists voice_enabled boolean not null default false,
@@ -142,6 +154,14 @@ alter table public.messages
 
 alter table public.messages
   add constraint messages_message_type_check check (message_type in ('text', 'voice', 'image'));
+
+alter table public.personas
+  drop constraint if exists personas_analysis_status_check;
+
+alter table public.personas
+  add constraint personas_analysis_status_check check (
+    analysis_status in ('queued', 'processing', 'retrying', 'completed', 'completed_basic', 'failed')
+  );
 
 -- 6. Auto-create user_profile on signup
 create or replace function public.handle_new_user()

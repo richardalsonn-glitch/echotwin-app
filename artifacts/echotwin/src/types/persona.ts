@@ -37,6 +37,12 @@ export interface Persona {
   display_name: string;
   avatar_url: string | null;
   analysis: PersonaAnalysis | null;
+  analysis_status?: AnalysisStatus | null;
+  analysis_error_code?: string | null;
+  analysis_provider?: string | null;
+  analysis_attempt_count?: number | null;
+  analysis_completed_at?: string | null;
+  analysis_summary_cache?: Record<string, unknown> | null;
   message_count_used: number;
   voice_sample_url: string | null;
   voice_profile_status: VoiceProfileStatus;
@@ -49,6 +55,14 @@ export interface Persona {
 }
 
 export type VoiceProfileStatus = "none" | "processing" | "ready" | "failed";
+
+export type AnalysisStatus =
+  | "queued"
+  | "processing"
+  | "retrying"
+  | "completed"
+  | "completed_basic"
+  | "failed";
 
 export interface VoiceProfileMetadata {
   file_name: string;

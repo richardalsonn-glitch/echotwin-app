@@ -33,8 +33,20 @@ function shouldRetrySameModel(
 ): boolean {
   if (attemptIndex + 1 >= maxAttempts) return false;
   if (!isAiServiceError(error)) return true;
-  if (!error.retryable || error.code === "ai_rate_limited") return false;
+  if (!error.retryable) return false;
   return true;
+}
+
+function getRetryDelayMs(attemptIndex: number): number {
+  const baseDelay = 650 * 2 ** attemptIndex;
+  const jitter = Math.round(Math.random() * 180);
+  return baseDelay + jitter;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function buildFailedAttempt(
@@ -123,6 +135,11 @@ export async function runTextWithFallback(request: AiTextRequest): Promise<AiTex
         logAttempt(failed);
 
         if (shouldRetrySameModel(error, attemptIndex, maxAttempts)) {
+          const delayMs = getRetryDelayMs(attemptIndex);
+          console.info(
+            `[ai] retrying task=${request.task} model=${model} attempt=${attemptIndex + 2}/${maxAttempts} delayMs=${delayMs}`
+          );
+          await sleep(delayMs);
           continue;
         }
 
@@ -169,6 +186,11 @@ export async function runStreamWithFallback(
         logAttempt(failed);
 
         if (shouldRetrySameModel(error, attemptIndex, maxAttempts)) {
+          const delayMs = getRetryDelayMs(attemptIndex);
+          console.info(
+            `[ai] retrying task=${request.task} model=${model} attempt=${attemptIndex + 2}/${maxAttempts} delayMs=${delayMs}`
+          );
+          await sleep(delayMs);
           continue;
         }
 

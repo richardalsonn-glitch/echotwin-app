@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/context/language-context";
 import type { TranslationKey } from "@/lib/i18n";
 
-type AnalysisState = "analyzing" | "success" | "error";
+type AnalysisState = "analyzing" | "retrying" | "success" | "error";
 
 const STEP_KEYS: TranslationKey[] = [
   "analyze.steps.0",
@@ -36,10 +36,16 @@ function AnalyzingPageContent() {
     const stepInterval = window.setInterval(() => {
       setCurrentStep((s) => Math.min(s + 1, STEP_KEYS.length - 1));
     }, 2500);
+    const retryHintTimer = window.setTimeout(() => {
+      setState((current) => (current === "analyzing" ? "retrying" : current));
+    }, 9000);
 
     void runAnalysis();
 
-    return () => window.clearInterval(stepInterval);
+    return () => {
+      window.clearInterval(stepInterval);
+      window.clearTimeout(retryHintTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personaId]);
 
@@ -51,9 +57,14 @@ function AnalyzingPageContent() {
         body: JSON.stringify({ persona_id: personaId }),
       });
 
+      const data: unknown = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const data: unknown = await res.json().catch(() => ({}));
         throw new Error(getApiError(data) ?? t("analyze.errorTitle"));
+      }
+
+      if (getStatus(data) === "completed_basic") {
+        toast.info(t("analyze.basicFallback"));
       }
 
       setState("success");
@@ -77,7 +88,7 @@ function AnalyzingPageContent() {
       }}
     >
       <AnimatePresence mode="wait">
-        {state === "analyzing" && (
+        {(state === "analyzing" || state === "retrying") && (
           <motion.div
             key="analyzing"
             initial={{ opacity: 0, y: 24 }}
@@ -104,7 +115,7 @@ function AnalyzingPageContent() {
                 {t("analyze.title")}
               </h2>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                {t("analyze.desc")}
+                {state === "retrying" ? t("analyze.retryingDesc") : t("analyze.desc")}
               </p>
             </div>
 
@@ -229,4 +240,10 @@ function getApiError(value: unknown): string | null {
   if (typeof value !== "object" || value === null) return null;
   const error = (value as Record<string, unknown>).error;
   return typeof error === "string" && error.trim() ? error : null;
+}
+
+function getStatus(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  const status = (value as Record<string, unknown>).status;
+  return typeof status === "string" ? status : null;
 }
