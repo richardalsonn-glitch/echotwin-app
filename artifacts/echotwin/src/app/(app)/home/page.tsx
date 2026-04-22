@@ -32,10 +32,10 @@ import {
   Trash2,
   User,
   Crown,
+  Heart,
   Sparkles,
   Bell,
   MessageCircle,
-  ChevronRight,
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { enUS, ja, tr as trLocale } from "date-fns/locale";
@@ -70,6 +70,114 @@ function formatLastTime(isoStr: string, language: Language, yesterday: string): 
   if (isYesterday(d)) return yesterday;
   const locale = language === "ja" ? ja : language === "en" ? enUS : trLocale;
   return format(d, "d MMM", { locale });
+}
+
+function HeartbeatSignature({
+  active,
+  eyebrow,
+  label,
+}: {
+  active: boolean;
+  eyebrow: string;
+  label: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.25, duration: 0.35 }}
+      className="relative mt-6 w-full overflow-hidden rounded-3xl border border-primary/12 bg-[#071421]/78 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(20,184,166,0.16),transparent_42%)]" />
+      <div className="relative flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/70">
+            {eyebrow}
+          </p>
+          <p className="mt-1 text-[13px] font-semibold text-white/82">
+            {label}
+          </p>
+        </div>
+        <motion.div
+          animate={active ? { scale: [1, 1.08, 1] } : { scale: [1, 1.03, 1] }}
+          transition={{ duration: active ? 1.4 : 2.8, repeat: Infinity, ease: "easeInOut" }}
+          className={`flex shrink-0 items-center justify-center rounded-2xl border ${
+            active
+              ? "h-9 w-9 border-primary/28 bg-primary/14 text-primary shadow-[0_0_22px_rgba(20,184,166,0.22)]"
+              : "h-12 w-12 border-primary/20 bg-primary/10 text-primary/82 shadow-[0_0_28px_rgba(20,184,166,0.18)]"
+          }`}
+        >
+          <Heart className={active ? "h-4 w-4 fill-current" : "h-5 w-5 fill-current"} />
+        </motion.div>
+      </div>
+
+      <div className="relative mt-3 h-16">
+        <svg
+          viewBox="0 0 420 90"
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="heartbeat-gradient" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="rgba(20,184,166,0.10)" />
+              <stop offset="48%" stopColor="rgba(20,184,166,0.92)" />
+              <stop offset="100%" stopColor="rgba(20,184,166,0.12)" />
+            </linearGradient>
+            <filter id="heartbeat-glow">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <path
+            d={
+              active
+                ? "M0 48 H70 L88 48 L98 28 L112 68 L128 40 L144 48 H196 L210 48 L222 18 L240 74 L256 42 L274 48 H420"
+                : "M0 48 H420"
+            }
+            fill="none"
+            stroke="rgba(20,184,166,0.16)"
+            strokeWidth="9"
+            strokeLinecap="round"
+          />
+          <motion.path
+            d={
+              active
+                ? "M0 48 H70 L88 48 L98 28 L112 68 L128 40 L144 48 H196 L210 48 L222 18 L240 74 L256 42 L274 48 H420"
+                : "M0 48 H420"
+            }
+            fill="none"
+            stroke="url(#heartbeat-gradient)"
+            strokeWidth={active ? 3 : 2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#heartbeat-glow)"
+            initial={false}
+            animate={
+              active
+                ? { pathLength: [0.45, 1, 0.45], opacity: [0.72, 1, 0.72] }
+                : { opacity: [0.42, 0.62, 0.42] }
+            }
+            transition={{ duration: active ? 2.4 : 3.4, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </svg>
+        {!active && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <motion.div
+              animate={{ scale: [1, 1.04, 1], opacity: [0.84, 1, 0.84] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="flex h-14 w-14 items-center justify-center rounded-full border border-primary/18 bg-[#071421] text-primary shadow-[0_0_34px_rgba(20,184,166,0.20)]"
+            >
+              <Heart className="h-6 w-6 fill-current" />
+            </motion.div>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
 }
 
 function truncate(str: string, len = 46): string {
@@ -393,6 +501,11 @@ export default function HomePage() {
                   {t("home.addFirst")}
                 </button>
               </Link>
+              <HeartbeatSignature
+                active={false}
+                eyebrow={t("home.heartbeatIdleEyebrow")}
+                label={t("home.heartbeatIdle")}
+              />
             </motion.div>
           ) : (
             /* ── Conversation list ── */
@@ -564,41 +677,11 @@ export default function HomePage() {
               </AnimatePresence>
 
               {/* Upgrade nudge — subtle, bottom of list */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="mt-6"
-              >
-                <Link href="/upgrade">
-                  <div
-                    className="flex items-center gap-4 p-4 rounded-2xl cursor-pointer hover:opacity-90 transition-opacity active:scale-[0.99]"
-                    style={{
-                      background: "linear-gradient(135deg, hsl(43,100%,10%) 0%, hsl(220,50%,8%) 100%)",
-                      border: "1px solid hsl(43,100%,50%,0.15)",
-                    }}
-                  >
-                    <div
-                      className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
-                      style={{
-                        background: "hsl(43,100%,50%,0.12)",
-                        border: "1px solid hsl(43,100%,50%,0.2)",
-                      }}
-                    >
-                      <Crown className="h-5 w-5 text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[13.5px] text-amber-200/90 leading-tight">
-                        {t("home.upgradeTitle")}
-                      </p>
-                      <p className="text-[12px] text-amber-500/60 mt-0.5">
-                        {t("home.upgradeDesc")}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-amber-500/50 shrink-0" />
-                  </div>
-                </Link>
-              </motion.div>
+              <HeartbeatSignature
+                active={sorted.length > 0}
+                eyebrow={sorted.length > 0 ? t("home.heartbeatActiveEyebrow") : t("home.heartbeatIdleEyebrow")}
+                label={sorted.length > 0 ? t("home.heartbeatActive") : t("home.heartbeatIdle")}
+              />
             </div>
           )}
         </div>

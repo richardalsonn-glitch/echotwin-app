@@ -442,7 +442,7 @@ export default function UpgradePage() {
                       </div>
                     )}
 
-                    <div className={`mb-3 flex items-start gap-2.5 ${plan.badgeKey ? "pr-24" : ""} ${isSelected ? "pt-7" : ""}`}>
+                    <div className={`mb-3 flex items-start gap-2.5 ${plan.badgeKey ? "pr-24" : ""}`}>
                       <div
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${plan.iconPanel}`}
                       >
@@ -463,7 +463,7 @@ export default function UpgradePage() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 6 }}
                         transition={{ duration: 0.14 }}
-                        className="mb-3"
+                        className="mb-3 min-h-[126px]"
                       >
                         {hasCouponDiscount && (
                           <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-white/34">
@@ -487,8 +487,12 @@ export default function UpgradePage() {
                               })
                             : t(plan.footnoteKey)}
                         </p>
-                        {isPaid && (
-                          <div className="mt-2 rounded-xl border border-white/8 bg-black/15 p-1.5">
+                        <div
+                          className={`mt-2 min-h-[52px] rounded-xl border border-white/8 bg-black/15 p-1.5 transition-opacity ${
+                            isPaid ? "opacity-100" : "pointer-events-none invisible opacity-0"
+                          }`}
+                          aria-hidden={!isPaid}
+                        >
                             <div className="flex items-center gap-1.5">
                               <BadgePercent className="h-3.5 w-3.5 shrink-0 text-primary/72" />
                               <input
@@ -515,19 +519,16 @@ export default function UpgradePage() {
                                 {t("pricing.applyCoupon")}
                               </button>
                             </div>
-                            {couponFeedback ? (
-                              <p
-                                className={`mt-1 truncate text-[10px] font-medium ${
-                                  couponFeedback.type === "success"
-                                    ? "text-primary/84"
-                                    : "text-rose-200/82"
-                                }`}
-                              >
-                                {couponFeedback.message}
-                              </p>
-                            ) : null}
+                            <p
+                              className={`mt-1 h-3 truncate text-[10px] font-medium ${
+                                couponFeedback?.type === "success"
+                                  ? "text-primary/84"
+                                  : "text-rose-200/82"
+                              }`}
+                            >
+                              {couponFeedback?.message ?? ""}
+                            </p>
                           </div>
-                        )}
                       </motion.div>
                     </AnimatePresence>
 
