@@ -16,7 +16,6 @@ import {
   Mic,
   Smartphone,
   Sparkles,
-  TicketPercent,
   Trash2,
   UserPlus,
   Zap,
@@ -345,71 +344,34 @@ export default function UpgradePage() {
           </div>
         </section>
 
-        <section className="grid gap-3 lg:grid-cols-[300px_1fr] lg:items-stretch">
-          <div className="rounded-[22px] border border-white/8 bg-white/[0.045] p-3.5">
-            <div className="mb-3 w-full rounded-2xl border border-white/8 bg-black/10 p-1">
-              {(["monthly", "yearly"] as const).map((cycle) => (
-                <button
-                  key={cycle}
-                  type="button"
-                  onClick={() => setBilling(cycle)}
-                  className={`relative h-10 w-1/2 rounded-xl text-[13px] font-semibold transition-all ${
-                    billing === cycle ? "text-white" : "text-white/40 hover:text-white/65"
-                  }`}
-                >
-                  {billing === cycle && (
-                    <motion.span
-                      layoutId="billing-active"
-                      className="absolute inset-0 rounded-xl border border-primary/25 bg-primary/16 shadow-[0_0_20px_rgba(20,184,166,0.18)]"
-                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                    />
+        <section className="flex flex-col gap-3">
+          <div className="w-full max-w-[320px] rounded-2xl border border-white/8 bg-white/[0.045] p-1">
+            {(["monthly", "yearly"] as const).map((cycle) => (
+              <button
+                key={cycle}
+                type="button"
+                onClick={() => setBilling(cycle)}
+                className={`relative h-10 w-1/2 rounded-xl text-[13px] font-semibold transition-all ${
+                  billing === cycle ? "text-white" : "text-white/40 hover:text-white/65"
+                }`}
+              >
+                {billing === cycle && (
+                  <motion.span
+                    layoutId="billing-active"
+                    className="absolute inset-0 rounded-xl border border-primary/25 bg-primary/16 shadow-[0_0_20px_rgba(20,184,166,0.18)]"
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                  />
+                )}
+                <span className="relative">
+                  {cycle === "monthly" ? t("pricing.monthly") : t("pricing.yearly")}
+                  {cycle === "yearly" && (
+                    <span className="ml-1.5 rounded-full bg-primary/18 px-1.5 py-0.5 text-[10px] text-primary">
+                      {t("pricing.yearDiscount")}
+                    </span>
                   )}
-                  <span className="relative">
-                    {cycle === "monthly" ? t("pricing.monthly") : t("pricing.yearly")}
-                    {cycle === "yearly" && (
-                      <span className="ml-1.5 rounded-full bg-primary/18 px-1.5 py-0.5 text-[10px] text-primary">
-                        {t("pricing.yearDiscount")}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="rounded-2xl border border-primary/12 bg-primary/[0.045] p-3">
-              <div className="mb-2 flex items-center gap-2 text-[12px] font-bold text-white/82">
-                <TicketPercent className="h-4 w-4 text-primary" />
-                {t("pricing.couponLabel")}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={couponInput}
-                  onChange={(event) => setCouponInput(event.target.value.toUpperCase())}
-                  placeholder={t("pricing.couponPlaceholder")}
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-white outline-none transition-colors placeholder:text-white/25 focus:border-primary/35"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyCoupon}
-                  className="h-10 rounded-xl bg-primary px-3 text-[12px] font-bold text-primary-foreground shadow-[0_0_18px_rgba(20,184,166,0.22)] transition-transform active:scale-[0.98]"
-                >
-                  {t("pricing.applyCoupon")}
-                </button>
-              </div>
-              {couponFeedback ? (
-                <p
-                  className={`mt-2 text-[11.5px] font-medium ${
-                    couponFeedback.type === "success" ? "text-primary/88" : "text-rose-200/86"
-                  }`}
-                >
-                  {couponFeedback.message}
-                </p>
-              ) : (
-                <p className="mt-2 text-[11px] leading-relaxed text-white/34">
-                  {t("pricing.couponHint")}
-                </p>
-              )}
-            </div>
+                </span>
+              </button>
+            ))}
           </div>
 
           <div className="-mx-4 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:mx-0 sm:px-0">
@@ -434,7 +396,7 @@ export default function UpgradePage() {
                     aria-pressed={isSelected}
                     onClick={() => setSelectedTier(plan.tier)}
                     onKeyDown={(event) => handleCardKeyDown(event, plan.tier)}
-                    className={`premium-card-hover relative flex h-[430px] w-[80vw] max-w-[292px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[438px] sm:w-auto sm:max-w-none ${
+                    className={`premium-card-hover relative flex h-[448px] w-[80vw] max-w-[292px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[456px] sm:w-auto sm:max-w-none ${
                       isSelected
                         ? "border-primary/70 bg-[#102735] shadow-[0_0_30px_rgba(20,184,166,0.22)]"
                         : "border-white/8 bg-[#0e1728] shadow-[0_12px_30px_rgba(0,0,0,0.22)] hover:border-primary/28"
@@ -525,6 +487,47 @@ export default function UpgradePage() {
                               })
                             : t(plan.footnoteKey)}
                         </p>
+                        {isPaid && (
+                          <div className="mt-2 rounded-xl border border-white/8 bg-black/15 p-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <BadgePercent className="h-3.5 w-3.5 shrink-0 text-primary/72" />
+                              <input
+                                value={couponInput}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) => setCouponInput(event.target.value.toUpperCase())}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.stopPropagation();
+                                    handleApplyCoupon();
+                                  }
+                                }}
+                                placeholder={t("pricing.couponMiniPlaceholder")}
+                                className="h-6 min-w-0 flex-1 bg-transparent text-[10.5px] font-bold uppercase tracking-[0.08em] text-white outline-none placeholder:text-white/28"
+                              />
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleApplyCoupon();
+                                }}
+                                className="h-6 rounded-lg bg-primary/18 px-2 text-[10px] font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                              >
+                                {t("pricing.applyCoupon")}
+                              </button>
+                            </div>
+                            {couponFeedback ? (
+                              <p
+                                className={`mt-1 truncate text-[10px] font-medium ${
+                                  couponFeedback.type === "success"
+                                    ? "text-primary/84"
+                                    : "text-rose-200/82"
+                                }`}
+                              >
+                                {couponFeedback.message}
+                              </p>
+                            ) : null}
+                          </div>
+                        )}
                       </motion.div>
                     </AnimatePresence>
 
