@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED_PATHS = ["/home", "/onboarding", "/chat", "/profile", "/upgrade"];
@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet: {
             name: string;
             value: string;
-            options?: any;
+            options?: CookieOptions;
           }[]
         ) {
           cookiesToSet.forEach(({ name, value }) => {
@@ -69,6 +69,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|favicon-16.png|favicon-32.png|manifest.json|sw.js|offline.html|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

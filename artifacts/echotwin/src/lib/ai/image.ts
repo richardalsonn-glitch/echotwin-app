@@ -198,7 +198,7 @@ function createImageClient(): OpenAI {
       ...(getOptionalEnv("OPENROUTER_APP_URL")
         ? { "HTTP-Referer": getOptionalEnv("OPENROUTER_APP_URL") }
         : {}),
-      "X-OpenRouter-Title": getOptionalEnv("OPENROUTER_APP_NAME") ?? "Bendeki Sen",
+      "X-OpenRouter-Title": getOptionalEnv("OPENROUTER_APP_NAME") ?? "BendekiSen",
     },
   });
 }

@@ -3,11 +3,11 @@
  * All backed by localStorage — no server dependency
  * ─────────────────────────────────────────────────────────── */
 
-const SOUND_KEY = "echotwin_sound_enabled";
-const UNREAD_KEY = (id: string) => `echotwin_unread_${id}`;
-const LASTMSG_KEY = (id: string) => `echotwin_lastmsg_${id}`;
-const NOTIF_ASKED_KEY = "echotwin_notif_asked";
-const NOTIFICATION_ENABLED_KEY = "echotwin_browser_notifications_enabled";
+const SOUND_KEY = "bendekisen_sound_enabled";
+const UNREAD_KEY = (id: string) => `bendekisen_unread_${id}`;
+const LASTMSG_KEY = (id: string) => `bendekisen_lastmsg_${id}`;
+const NOTIF_ASKED_KEY = "bendekisen_notif_asked";
+const NOTIFICATION_ENABLED_KEY = "bendekisen_browser_notifications_enabled";
 
 /* ─── Sound ─────────────────────────────────────────────── */
 
@@ -117,7 +117,7 @@ export function showBrowserNotification(
   try {
     new Notification(title, {
       body,
-      icon: iconUrl ?? "/favicon.svg",
+      icon: iconUrl ?? "/icons/icon-192.png",
       silent: true, // We handle sound ourselves
     });
   } catch {

@@ -1,4 +1,4 @@
-# EchoTwin
+# BendekiSen
 
 ## Voice input
 

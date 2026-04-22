@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "node ./scripts/enforce-pnpm.cjs",
-    "dev": "pnpm --filter @workspace/echotwin dev",
+    "dev": "pnpm --filter @workspace/bendekisen dev",
     "auto-push": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/auto-push.ps1",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",

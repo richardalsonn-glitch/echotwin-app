@@ -45,7 +45,7 @@ function getProviderConfig(): {
       process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ??
       "https://openrouter.ai/api/v1",
     appURL: process.env.OPENROUTER_APP_URL ?? process.env.OPENROUTER_SITE_URL,
-    appName: process.env.OPENROUTER_APP_NAME ?? "Bendeki Sen",
+    appName: process.env.OPENROUTER_APP_NAME ?? "BendekiSen",
   };
 }
 
