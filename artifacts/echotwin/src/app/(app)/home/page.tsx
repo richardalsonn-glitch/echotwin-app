@@ -81,6 +81,10 @@ function HeartbeatSignature({
   eyebrow: string;
   label: string;
 }) {
+  const heartbeatPath =
+    "M0 48 H38 C48 48 55 48 62 48 L74 30 L88 66 L103 40 L118 48 H160 C172 48 181 48 192 48 L204 20 L222 74 L240 42 L256 48 H318 C330 48 338 48 348 48 L360 34 L374 62 L388 44 L404 48 H420";
+  const idlePath = "M0 48 H420";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -111,9 +115,9 @@ function HeartbeatSignature({
         </motion.div>
       </div>
 
-      <div className="relative mt-3 h-16">
+      <div className="relative mt-3 h-16 overflow-hidden rounded-2xl">
         <svg
-          viewBox="0 0 420 90"
+          viewBox="0 0 840 90"
           preserveAspectRatio="none"
           className="absolute inset-0 h-full w-full"
           aria-hidden="true"
@@ -125,44 +129,101 @@ function HeartbeatSignature({
               <stop offset="100%" stopColor="rgba(20,184,166,0.12)" />
             </linearGradient>
             <filter id="heartbeat-glow">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+              <feGaussianBlur stdDeviation="3.2" result="coloredBlur" />
               <feMerge>
                 <feMergeNode in="coloredBlur" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
+            <linearGradient id="heartbeat-sweep" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="rgba(20,184,166,0)" />
+              <stop offset="18%" stopColor="rgba(20,184,166,0.18)" />
+              <stop offset="50%" stopColor="rgba(105,255,243,0.98)" />
+              <stop offset="82%" stopColor="rgba(20,184,166,0.22)" />
+              <stop offset="100%" stopColor="rgba(20,184,166,0)" />
+            </linearGradient>
           </defs>
-          <path
-            d={
-              active
-                ? "M0 48 H70 L88 48 L98 28 L112 68 L128 40 L144 48 H196 L210 48 L222 18 L240 74 L256 42 L274 48 H420"
-                : "M0 48 H420"
-            }
-            fill="none"
-            stroke="rgba(20,184,166,0.16)"
-            strokeWidth="9"
-            strokeLinecap="round"
-          />
-          <motion.path
-            d={
-              active
-                ? "M0 48 H70 L88 48 L98 28 L112 68 L128 40 L144 48 H196 L210 48 L222 18 L240 74 L256 42 L274 48 H420"
-                : "M0 48 H420"
-            }
-            fill="none"
-            stroke="url(#heartbeat-gradient)"
-            strokeWidth={active ? 3 : 2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            filter="url(#heartbeat-glow)"
-            initial={false}
-            animate={
-              active
-                ? { pathLength: [0.45, 1, 0.45], opacity: [0.72, 1, 0.72] }
-                : { opacity: [0.42, 0.62, 0.42] }
-            }
-            transition={{ duration: active ? 2.4 : 3.4, repeat: Infinity, ease: "easeInOut" }}
-          />
+          {active ? (
+            <g>
+              <path
+                d={heartbeatPath}
+                fill="none"
+                stroke="rgba(20,184,166,0.16)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d={heartbeatPath}
+                transform="translate(420 0)"
+                fill="none"
+                stroke="rgba(20,184,166,0.16)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
+          ) : (
+            <path
+              d="M0 48 H840"
+              fill="none"
+              stroke="rgba(20,184,166,0.16)"
+              strokeWidth="7"
+              strokeLinecap="round"
+            />
+          )}
+          {active ? (
+            <>
+              <motion.g
+                initial={{ x: 0 }}
+                animate={{ x: [-420, 0] }}
+                transition={{ duration: 2.65, repeat: Infinity, ease: "linear" }}
+              >
+                <path
+                  d={heartbeatPath}
+                  fill="none"
+                  stroke="url(#heartbeat-gradient)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter="url(#heartbeat-glow)"
+                />
+                <path
+                  d={heartbeatPath}
+                  transform="translate(420 0)"
+                  fill="none"
+                  stroke="url(#heartbeat-gradient)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter="url(#heartbeat-glow)"
+                />
+              </motion.g>
+              <motion.rect
+                x="-160"
+                y="0"
+                width="210"
+                height="90"
+                fill="url(#heartbeat-sweep)"
+                initial={{ x: 0 }}
+                animate={{ x: [0, 1000] }}
+                transition={{ duration: 2.65, repeat: Infinity, ease: "linear" }}
+                style={{ mixBlendMode: "screen" }}
+              />
+            </>
+          ) : (
+            <motion.path
+              d={idlePath}
+              fill="none"
+              stroke="url(#heartbeat-gradient)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              filter="url(#heartbeat-glow)"
+              initial={false}
+              animate={{ opacity: [0.42, 0.62, 0.42] }}
+              transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
+            />
+          )}
         </svg>
         {!active && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -342,7 +403,10 @@ export default function HomePage() {
     <div className="max-w-md mx-auto min-h-screen flex flex-col" style={{ background: "hsl(220,40%,6%)" }}>
 
       {/* ── Sticky top bar ── */}
-      <div className="sticky top-0 z-20 px-5 py-3.5 flex items-center justify-between bg-transparent backdrop-blur-2xl border-b border-white/4">
+      <div
+        className="sticky top-0 z-20 flex items-center justify-between border-b border-white/4 bg-transparent px-5 pb-3.5 pt-3.5 backdrop-blur-2xl"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.875rem)" }}
+      >
         <AppMenu initialAuthenticated />
         <span className="text-[13px] font-semibold gradient-text tracking-wide">{t("common.appName")}</span>
         <div className="h-9 w-9" aria-hidden="true" />

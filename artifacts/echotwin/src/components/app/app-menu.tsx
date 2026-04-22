@@ -175,13 +175,23 @@ export function AppMenu({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <div className={cn(floating && "fixed left-4 top-4 z-40", className)}>
+      <div
+        className={cn(floating && "fixed z-40", className)}
+        style={
+          floating
+            ? {
+                left: "calc(env(safe-area-inset-left, 0px) + 1rem)",
+                top: "calc(env(safe-area-inset-top, 0px) + 0.875rem)",
+              }
+            : undefined
+        }
+      >
         <SheetTrigger asChild>
           <button
             type="button"
             aria-label={t("menu.open")}
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] text-white/80 shadow-[0_0_22px_rgba(20,184,166,0.12)] backdrop-blur-xl transition-all hover:border-primary/35 hover:bg-primary/10 hover:text-primary active:scale-95",
+              "flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] text-white/80 shadow-[0_0_22px_rgba(20,184,166,0.12)] backdrop-blur-xl transition-all hover:border-primary/35 hover:bg-primary/10 hover:text-primary active:scale-95",
               triggerClassName
             )}
           >
