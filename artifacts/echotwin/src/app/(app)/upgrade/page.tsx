@@ -374,8 +374,8 @@ export default function UpgradePage() {
             ))}
           </div>
 
-          <div className="-mx-4 overflow-x-auto px-4 py-3 [scrollbar-width:none] sm:mx-0 sm:px-0">
-            <div className="flex min-w-max snap-x snap-mandatory gap-3 sm:grid sm:min-w-0 sm:grid-cols-3 sm:gap-3 lg:gap-4">
+          <div className="-mx-4 overflow-x-auto px-5 py-3 [scrollbar-width:none] sm:mx-0 sm:px-2 sm:py-4">
+            <div className="flex min-w-max snap-x snap-mandatory gap-4 sm:grid sm:min-w-0 sm:grid-cols-3 sm:gap-4 lg:gap-5">
               {plans.map((plan) => {
                 const Icon = plan.icon;
                 const isSelected = selectedTier === plan.tier;
@@ -396,7 +396,7 @@ export default function UpgradePage() {
                     aria-pressed={isSelected}
                     onClick={() => setSelectedTier(plan.tier)}
                     onKeyDown={(event) => handleCardKeyDown(event, plan.tier)}
-                    className={`premium-card-hover relative flex h-[448px] w-[80vw] max-w-[292px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[456px] sm:w-auto sm:max-w-none ${
+                    className={`premium-card-hover relative flex h-[448px] w-[78vw] max-w-[286px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[456px] sm:w-auto sm:max-w-none ${
                       isSelected
                         ? "border-primary/70 bg-[#102735] shadow-[0_0_30px_rgba(20,184,166,0.22)]"
                         : "border-white/8 bg-[#0e1728] shadow-[0_12px_30px_rgba(0,0,0,0.22)] hover:border-primary/28"
@@ -409,12 +409,12 @@ export default function UpgradePage() {
                           : "linear-gradient(150deg, rgba(15,26,44,0.96), rgba(9,16,30,0.98))",
                     }}
                     animate={{
-                      scale: isSelected ? 1.045 : plan.featured ? 1.018 : 1,
+                      scale: isSelected ? 1.018 : plan.featured ? 1.008 : 1,
                       opacity: isSelected ? 1 : plan.featured ? 0.96 : 0.84,
-                      y: plan.featured ? -4 : 0,
+                      y: plan.featured ? -2 : 0,
                     }}
                     whileHover={{
-                      scale: isSelected ? 1.045 : 1.018,
+                      scale: isSelected ? 1.018 : 1.01,
                       opacity: 1,
                     }}
                     whileTap={{ scale: 0.98 }}
@@ -576,7 +576,7 @@ export default function UpgradePage() {
           </div>
         </section>
 
-        <p className="flex items-center justify-center gap-2 pb-5 text-center text-[12px] leading-relaxed text-white/28">
+        <p className="flex items-center justify-center gap-2 pb-5 text-center text-[12px] leading-relaxed text-white/36">
           <Smartphone className="h-4 w-4 text-primary/45" />
           {t("pricing.storePaymentNote")}
         </p>
