@@ -173,11 +173,6 @@ export function AppMenu({
     }
   }
 
-  const authTitle = isAuthenticated ? t("menu.authOpen") : t("menu.authClosed");
-  const authDescription = isAuthenticated
-    ? t("menu.authOpenDesc")
-    : t("menu.authClosedDesc");
-
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <div className={cn(floating && "fixed left-4 top-4 z-40", className)}>
@@ -289,10 +284,14 @@ export function AppMenu({
               </span>
             </button>
 
-            <div className="mb-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
-              <p className="text-sm font-semibold text-white/86">{authTitle}</p>
-              <p className="mt-1 text-xs leading-relaxed text-white/42">{authDescription}</p>
-            </div>
+            {isAuthenticated && (
+              <div className="mb-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
+                <p className="text-sm font-semibold text-white/86">{t("menu.authOpen")}</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/42">
+                  {t("menu.authOpenDesc")}
+                </p>
+              </div>
+            )}
 
             {isAuthenticated ? (
               <button
@@ -319,4 +318,3 @@ export function AppMenu({
     </Sheet>
   );
 }
-

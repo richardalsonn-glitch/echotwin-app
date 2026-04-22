@@ -1,6 +1,7 @@
 "use client";
 
 import { MessageCircle } from "lucide-react";
+import { LanguageSwitcher } from "@/components/app/language-switcher";
 import { useI18n } from "@/context/language-context";
 
 export function AuthBrand() {
@@ -17,7 +18,9 @@ export function AuthBrand() {
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         {t("auth.tagline")}
       </p>
+      <div className="mt-5 flex justify-center">
+        <LanguageSwitcher />
+      </div>
     </div>
   );
 }
-
