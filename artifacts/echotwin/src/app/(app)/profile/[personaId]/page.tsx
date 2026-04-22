@@ -255,7 +255,7 @@ export default function ProfilePage({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="safe-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -266,11 +266,16 @@ export default function ProfilePage({
   const analysis = persona.analysis;
 
   return (
-    <div className="max-w-md mx-auto min-h-screen flex flex-col ambient-bg">
+    <div className="safe-screen mx-auto flex max-w-md flex-col ambient-bg">
       {/* Header */}
-      <div className="px-4 py-3 flex items-center gap-3 border-b border-white/5 bg-background/70 backdrop-blur-xl">
+      <div className="safe-header sticky top-0 z-20 flex items-center gap-3 border-b border-white/5 bg-background/80 px-4 pb-3 backdrop-blur-xl">
         <Link href="/home">
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 rounded-xl text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            aria-label="Geri"
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>

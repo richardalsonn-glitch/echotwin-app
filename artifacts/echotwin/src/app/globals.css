@@ -329,6 +329,18 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.safe-screen {
+  min-height: 100dvh;
+}
+
+.safe-header {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+}
+
+.safe-header-compact {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.875rem);
+}
+
 /* Gradient text */
 .gradient-text {
   background: linear-gradient(135deg, hsl(183 82% 55%), hsl(196 72% 65%));

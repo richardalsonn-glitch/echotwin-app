@@ -329,12 +329,9 @@ try {
       : t("select.voiceLocked");
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col ambient-bg">
+    <div className="safe-screen mx-auto flex max-w-md flex-col ambient-bg">
       {/* Header */}
-      <div
-        className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/5 bg-background/80 px-4 pb-4 pt-4 backdrop-blur-xl"
-        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
-      >
+      <div className="safe-header sticky top-0 z-20 flex items-center gap-3 border-b border-white/5 bg-background/80 px-4 pb-4 backdrop-blur-xl">
         <Link href="/onboarding/upload">
           <Button
             variant="ghost"

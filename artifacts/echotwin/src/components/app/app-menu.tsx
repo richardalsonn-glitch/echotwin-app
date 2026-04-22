@@ -204,7 +204,8 @@ export function AppMenu({
 
       <SheetContent
         side="left"
-        className="w-[86vw] max-w-[360px] overflow-hidden border-r border-primary/15 bg-[#07101f]/95 p-0 text-white shadow-[24px_0_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl [&>button]:hidden"
+        hideCloseButton
+        className="w-[86vw] max-w-[360px] overflow-hidden border-r border-primary/15 bg-[#07101f]/95 p-0 text-white shadow-[24px_0_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_22%_10%,rgba(20,184,166,0.22),transparent_58%)]" />
         <SheetClose asChild>

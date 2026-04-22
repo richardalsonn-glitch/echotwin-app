@@ -286,12 +286,9 @@ export default function UpgradePage() {
   );
 
   return (
-    <div className="min-h-[100svh] bg-[#0B1220] text-white">
-      <header
-        className="sticky top-0 z-20 border-b border-white/6 bg-[#0a1121]/90 backdrop-blur-2xl"
-        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
-      >
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+    <div className="safe-screen bg-[#0B1220] text-white">
+      <header className="safe-header-compact sticky top-0 z-20 border-b border-white/6 bg-[#0a1121]/90 backdrop-blur-2xl">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
           <Link href="/home">
             <button
               type="button"
@@ -374,7 +371,7 @@ export default function UpgradePage() {
             ))}
           </div>
 
-          <div className="-mx-4 overflow-x-auto px-5 py-3 [scrollbar-width:none] sm:mx-0 sm:px-2 sm:py-4">
+          <div className="-mx-4 overflow-x-auto overflow-y-visible px-5 py-5 [scrollbar-width:none] sm:mx-0 sm:px-2">
             <div className="flex min-w-max snap-x snap-mandatory gap-4 sm:grid sm:min-w-0 sm:grid-cols-3 sm:gap-4 lg:gap-5">
               {plans.map((plan) => {
                 const Icon = plan.icon;
@@ -396,7 +393,7 @@ export default function UpgradePage() {
                     aria-pressed={isSelected}
                     onClick={() => setSelectedTier(plan.tier)}
                     onKeyDown={(event) => handleCardKeyDown(event, plan.tier)}
-                    className={`premium-card-hover relative flex h-[448px] w-[78vw] max-w-[286px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[456px] sm:w-auto sm:max-w-none ${
+                    className={`premium-card-hover relative flex h-[548px] w-[78vw] max-w-[286px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[528px] sm:w-auto sm:max-w-none ${
                       isSelected
                         ? "border-primary/70 bg-[#102735] shadow-[0_0_30px_rgba(20,184,166,0.22)]"
                         : "border-white/8 bg-[#0e1728] shadow-[0_12px_30px_rgba(0,0,0,0.22)] hover:border-primary/28"
@@ -409,12 +406,12 @@ export default function UpgradePage() {
                           : "linear-gradient(150deg, rgba(15,26,44,0.96), rgba(9,16,30,0.98))",
                     }}
                     animate={{
-                      scale: isSelected ? 1.018 : plan.featured ? 1.008 : 1,
+                      scale: isSelected ? 1.01 : plan.featured ? 1.004 : 1,
                       opacity: isSelected ? 1 : plan.featured ? 0.96 : 0.84,
-                      y: plan.featured ? -2 : 0,
+                      y: 0,
                     }}
                     whileHover={{
-                      scale: isSelected ? 1.018 : 1.01,
+                      scale: isSelected ? 1.01 : 1.006,
                       opacity: 1,
                     }}
                     whileTap={{ scale: 0.98 }}
@@ -430,19 +427,24 @@ export default function UpgradePage() {
                     {isSelected && (
                       <div className="pointer-events-none absolute inset-0 rounded-[24px] ring-1 ring-inset ring-primary/40" />
                     )}
-                    {isSelected && (
-                      <div className="absolute left-3 top-3 rounded-full border border-primary/30 bg-primary/16 px-2.5 py-1 text-[10px] font-bold text-primary">
-                        {t("common.selected")}
-                      </div>
-                    )}
+                    <div className="mb-2 flex min-h-[26px] items-center justify-between gap-2">
+                      {isSelected ? (
+                        <span className="rounded-full border border-primary/30 bg-primary/16 px-2.5 py-1 text-[10px] font-bold text-primary">
+                          {t("common.selected")}
+                        </span>
+                      ) : (
+                        <span aria-hidden="true" />
+                      )}
+                      {plan.badgeKey ? (
+                        <span className="rounded-full border border-amber-300/25 bg-amber-300/12 px-2.5 py-1 text-[10px] font-bold text-amber-200 shadow-[0_0_16px_rgba(251,191,36,0.12)]">
+                          {t(plan.badgeKey)}
+                        </span>
+                      ) : (
+                        <span aria-hidden="true" />
+                      )}
+                    </div>
 
-                    {plan.badgeKey && (
-                      <div className="absolute right-3 top-3 rounded-full border border-amber-300/25 bg-amber-300/12 px-2.5 py-1 text-[10px] font-bold text-amber-200 shadow-[0_0_16px_rgba(251,191,36,0.12)]">
-                        {t(plan.badgeKey)}
-                      </div>
-                    )}
-
-                    <div className={`mb-3 flex items-start gap-2.5 ${plan.badgeKey ? "pr-24" : ""}`}>
+                    <div className="mb-3 flex items-start gap-2.5">
                       <div
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${plan.iconPanel}`}
                       >
@@ -532,7 +534,7 @@ export default function UpgradePage() {
                       </motion.div>
                     </AnimatePresence>
 
-                    <div className="mb-3 space-y-1.5">
+                    <div className="mb-3 flex-1 space-y-1.5 overflow-hidden">
                       {plan.features.map(({ icon: FeatureIcon, labelKey, locked }) => (
                         <div
                           key={labelKey}
