@@ -1,7 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 
 export async function registerAction(formData: FormData) {
   const email = formData.get("email") as string;
@@ -23,7 +23,7 @@ export async function registerAction(formData: FormData) {
       error.message.includes("already registered") ||
       error.message.includes("already been registered")
     ) {
-      return { error: "Bu e-posta zaten kayıtlı. Giriş yapmayı dene." };
+      return { error: "email_already_registered" };
     }
     return { error: error.message };
   }
@@ -32,6 +32,6 @@ export async function registerAction(formData: FormData) {
     redirect("/home");
   }
 
-  // E-posta doğrulaması gerekiyor
   return { emailSent: true, email };
 }
+

@@ -18,7 +18,9 @@ import {
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useI18n } from "@/context/language-context";
 import { TIER_PRICES } from "@/lib/subscription/limits";
+import type { Language, TranslationKey } from "@/lib/i18n";
 
 type BillingCycle = "monthly" | "yearly";
 type PaidTier = "basic" | "full";
@@ -26,29 +28,29 @@ type SelectableTier = "free" | PaidTier;
 
 type PlanFeature = {
   icon: LucideIcon;
-  label: string;
+  labelKey: TranslationKey;
   locked?: boolean;
 };
 
 type PlanCard = {
   tier: SelectableTier;
-  name: string;
-  description: string;
+  nameKey: TranslationKey;
+  descriptionKey: TranslationKey;
   icon: LucideIcon;
   price: number;
-  suffix: string;
   features: PlanFeature[];
-  cta: string;
-  badge?: string;
+  ctaKey: TranslationKey;
+  badgeKey?: TranslationKey;
   featured?: boolean;
-  footnote?: string;
+  footnoteKey: TranslationKey;
   iconTone: string;
   iconPanel: string;
 };
 
-function formatPrice(price: number): string {
+function formatPrice(price: number, language: Language): string {
   if (price === 0) return "₺0";
-  return `₺${new Intl.NumberFormat("tr-TR", {
+  const locale = language === "tr" ? "tr-TR" : language === "ja" ? "ja-JP" : "en-US";
+  return `₺${new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(price)}`;
@@ -62,6 +64,7 @@ function getFeatureIconTone(tier: SelectableTier, locked?: boolean): string {
 }
 
 export default function UpgradePage() {
+  const { language, t } = useI18n();
   const [billing, setBilling] = useState<BillingCycle>("monthly");
   const [selectedTier, setSelectedTier] = useState<SelectableTier>("full");
 
@@ -73,76 +76,72 @@ export default function UpgradePage() {
   const plans: PlanCard[] = [
     {
       tier: "free",
-      name: "Ücretsiz",
-      description: "Deneyimi keşfetmek için ideal başlangıç.",
+      nameKey: "pricing.free.name",
+      descriptionKey: "pricing.free.desc",
       icon: MessageCircle,
       price: 0,
-      suffix: "/ ay",
-      cta: "Mevcut Plan",
-      footnote: "Başlangıç paketi",
+      ctaKey: "pricing.free.cta",
+      footnoteKey: "pricing.free.foot",
       iconTone: "text-white/92",
       iconPanel: "border-white/14 bg-white/[0.08]",
       features: [
-        { icon: MessageCircle, label: "1 profil oluşturma" },
-        { icon: MessageCircle, label: "5 mesaj hakkı" },
-        { icon: Check, label: "Profil fotoğrafı yükleme" },
-        { icon: Sparkles, label: "Temel persona denemesi" },
-        { icon: Lock, label: "Ses özellikleri kapalı", locked: true },
-        { icon: Lock, label: "Medya özellikleri sınırlı", locked: true },
+        { icon: MessageCircle, labelKey: "pricing.free.feature.0" },
+        { icon: MessageCircle, labelKey: "pricing.free.feature.1" },
+        { icon: Check, labelKey: "pricing.free.feature.2" },
+        { icon: Sparkles, labelKey: "pricing.free.feature.3" },
+        { icon: Lock, labelKey: "pricing.free.feature.4", locked: true },
+        { icon: Lock, labelKey: "pricing.free.feature.5", locked: true },
       ],
     },
     {
       tier: "basic",
-      name: "Temel",
-      description: "Düzenli sohbet ve temel analiz isteyenler için.",
+      nameKey: "pricing.basic.name",
+      descriptionKey: "pricing.basic.desc",
       icon: Zap,
       price: basicPrice,
-      suffix: "/ ay",
-      cta: "Temele Geç",
-      footnote: "Aylık kullanım",
+      ctaKey: "pricing.basic.cta",
+      footnoteKey: "pricing.basic.foot",
       iconTone: "text-yellow-300",
       iconPanel: "border-yellow-300/24 bg-yellow-300/10 shadow-[0_0_18px_rgba(250,204,21,0.10)]",
       features: [
-        { icon: UserPlus, label: "2 profil oluşturma" },
-        { icon: MessageCircle, label: "Aylık 100 mesaj hakkı" },
-        { icon: Check, label: "Profil fotoğrafı yükleme" },
-        { icon: Check, label: "Profil adı düzenleme" },
-        { icon: Trash2, label: "Sohbet silme" },
-        { icon: BarChart3, label: "Temel ilişki analizi" },
-        { icon: Lock, label: "Gelişmiş hafıza kapalı", locked: true },
-        { icon: Lock, label: "Sesli özellikler sınırlı", locked: true },
+        { icon: UserPlus, labelKey: "pricing.basic.feature.0" },
+        { icon: MessageCircle, labelKey: "pricing.basic.feature.1" },
+        { icon: Check, labelKey: "pricing.basic.feature.2" },
+        { icon: Check, labelKey: "pricing.basic.feature.3" },
+        { icon: Trash2, labelKey: "pricing.basic.feature.4" },
+        { icon: BarChart3, labelKey: "pricing.basic.feature.5" },
+        { icon: Lock, labelKey: "pricing.basic.feature.6", locked: true },
+        { icon: Lock, labelKey: "pricing.basic.feature.7", locked: true },
       ],
     },
     {
       tier: "full",
-      name: "Full",
-      description: "Ses, medya ve daha derin deneyim isteyenler için.",
+      nameKey: "pricing.full.name",
+      descriptionKey: "pricing.full.desc",
       icon: Crown,
       price: fullPrice,
-      suffix: "/ ay",
-      cta: "Fulla Geç",
-      badge: "En Çok Tercih Edilen",
+      ctaKey: "pricing.full.cta",
+      badgeKey: "pricing.popular",
       featured: true,
-      footnote: "En güçlü deneyim",
+      footnoteKey: "pricing.full.foot",
       iconTone: "text-amber-300",
       iconPanel: "border-amber-300/28 bg-amber-300/12 shadow-[0_0_20px_rgba(251,191,36,0.14)]",
       features: [
-        { icon: InfinityIcon, label: "Sınırsız profil ve mesaj" },
-        { icon: Sparkles, label: "Gelişmiş AI yanıtları" },
-        { icon: Mic, label: "Ses profili ve sesli mesaj" },
-        { icon: BarChart3, label: "Gelişmiş analiz" },
-        { icon: Check, label: "Export ve yedekleme" },
-        { icon: MessageCircle, label: "Medyalı sohbet desteği" },
-        { icon: Sparkles, label: "Fotoğraf analizi ve hafıza desteği" },
-        { icon: Zap, label: "Öncelikli özellik erişimi" },
+        { icon: InfinityIcon, labelKey: "pricing.full.feature.0" },
+        { icon: Sparkles, labelKey: "pricing.full.feature.1" },
+        { icon: Mic, labelKey: "pricing.full.feature.2" },
+        { icon: BarChart3, labelKey: "pricing.full.feature.3" },
+        { icon: Check, labelKey: "pricing.full.feature.4" },
+        { icon: MessageCircle, labelKey: "pricing.full.feature.5" },
+        { icon: Sparkles, labelKey: "pricing.full.feature.6" },
+        { icon: Zap, labelKey: "pricing.full.feature.7" },
       ],
     },
   ];
 
   function handleSubscribe(tier: PaidTier) {
-    alert(
-      `${tier === "basic" ? "Temel" : "Full"} plan aboneliği yakında aktif olacak! Şimdilik ücretsiz devam edebilirsin.`
-    );
+    const planKey = tier === "basic" ? "pricing.basic.name" : "pricing.full.name";
+    alert(t("pricing.comingSoon", { plan: t(planKey) }));
   }
 
   function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>, tier: SelectableTier) {
@@ -167,15 +166,15 @@ export default function UpgradePage() {
             <button
               type="button"
               className="flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/70 transition-colors hover:border-primary/30 hover:text-primary"
-              aria-label="Geri dön"
+              aria-label={t("common.back")}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
           </Link>
           <div className="min-w-0">
-            <h1 className="text-[15px] font-bold text-white/92">Üyelik Paketleri</h1>
+            <h1 className="text-[15px] font-bold text-white/92">{t("pricing.title")}</h1>
             <p className="truncate text-[11.5px] text-white/42">
-              Paketleri karşılaştır, sana uygun deneyimi seç
+              {t("pricing.subtitle")}
             </p>
           </div>
         </div>
@@ -186,13 +185,13 @@ export default function UpgradePage() {
           <div className="max-w-xl">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/18 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary">
               <Crown className="h-3.5 w-3.5" />
-              Bendeki Sen Premium
+              {t("pricing.badge")}
             </div>
             <h2 className="text-[26px] font-bold leading-tight tracking-tight sm:text-[32px]">
-              Daha fazla konuş, daha gerçek hisset.
+              {t("pricing.hero")}
             </h2>
             <p className="mt-1.5 max-w-lg text-[13px] leading-relaxed text-white/48">
-              Paketleri tek ekranda karşılaştır, ihtiyacına uygun deneyimi seç.
+              {t("pricing.desc")}
             </p>
           </div>
 
@@ -214,10 +213,10 @@ export default function UpgradePage() {
                   />
                 )}
                 <span className="relative">
-                  {cycle === "monthly" ? "Aylık" : "Yıllık"}
+                  {cycle === "monthly" ? t("pricing.monthly") : t("pricing.yearly")}
                   {cycle === "yearly" && (
                     <span className="ml-1.5 rounded-full bg-primary/18 px-1.5 py-0.5 text-[10px] text-primary">
-                      %10
+                      {t("pricing.yearDiscount")}
                     </span>
                   )}
                 </span>
@@ -250,8 +249,8 @@ export default function UpgradePage() {
                     background: isSelected
                       ? "linear-gradient(150deg, rgba(17,48,58,0.98), rgba(9,24,38,0.98) 58%, rgba(11,18,32,0.98))"
                       : plan.featured
-                      ? "linear-gradient(150deg, rgba(14,35,43,0.96), rgba(8,19,32,0.98) 62%, rgba(11,18,32,0.98))"
-                      : "linear-gradient(150deg, rgba(15,26,44,0.96), rgba(9,16,30,0.98))",
+                        ? "linear-gradient(150deg, rgba(14,35,43,0.96), rgba(8,19,32,0.98) 62%, rgba(11,18,32,0.98))"
+                        : "linear-gradient(150deg, rgba(15,26,44,0.96), rgba(9,16,30,0.98))",
                   }}
                   animate={{
                     scale: isSelected ? 1.045 : 1,
@@ -276,26 +275,26 @@ export default function UpgradePage() {
                   )}
                   {isSelected && (
                     <div className="absolute left-3 top-3 rounded-full border border-primary/30 bg-primary/16 px-2.5 py-1 text-[10px] font-bold text-primary">
-                      Seçili
+                      {t("common.selected")}
                     </div>
                   )}
 
-                  {plan.badge && (
+                  {plan.badgeKey && (
                     <div className="absolute right-3 top-3 rounded-full border border-amber-300/25 bg-amber-300/12 px-2.5 py-1 text-[10px] font-bold text-amber-200 shadow-[0_0_16px_rgba(251,191,36,0.12)]">
-                      {plan.badge}
+                      {t(plan.badgeKey)}
                     </div>
                   )}
 
-                  <div className={`mb-3 flex items-start gap-2.5 ${plan.badge ? "pr-24" : ""} ${isSelected ? "pt-7" : ""}`}>
+                  <div className={`mb-3 flex items-start gap-2.5 ${plan.badgeKey ? "pr-24" : ""} ${isSelected ? "pt-7" : ""}`}>
                     <div
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${plan.iconPanel}`}
                     >
                       <Icon className={`h-5 w-5 ${plan.iconTone}`} />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-[17px] font-bold text-white">{plan.name}</h3>
+                      <h3 className="text-[17px] font-bold text-white">{t(plan.nameKey)}</h3>
                       <p className="mt-0.5 text-[11.5px] leading-snug text-white/48">
-                        {plan.description}
+                        {t(plan.descriptionKey)}
                       </p>
                     </div>
                   </div>
@@ -311,20 +310,22 @@ export default function UpgradePage() {
                     >
                       <p className="flex items-baseline gap-1.5">
                         <span className="text-[30px] font-black leading-none tracking-tight text-white sm:text-[31px]">
-                          {formatPrice(plan.price)}
+                          {formatPrice(plan.price, language)}
                         </span>
-                        <span className="text-[13px] font-medium text-white/38">{plan.suffix}</span>
+                        <span className="text-[13px] font-medium text-white/38">
+                          {t("pricing.perMonth")}
+                        </span>
                       </p>
                       <p className="mt-1 h-4 text-[11px] font-semibold text-primary/72">
-                        {plan.footnote ?? "Başlangıç paketi"}
+                        {t(plan.footnoteKey)}
                       </p>
                     </motion.div>
                   </AnimatePresence>
 
                   <div className="mb-3 space-y-1.5">
-                    {plan.features.map(({ icon: FeatureIcon, label, locked }) => (
+                    {plan.features.map(({ icon: FeatureIcon, labelKey, locked }) => (
                       <div
-                        key={label}
+                        key={labelKey}
                         className={`flex items-start gap-2 text-[11.5px] leading-tight ${
                           locked ? "text-white/36" : "text-white/76"
                         }`}
@@ -335,7 +336,7 @@ export default function UpgradePage() {
                             locked
                           )}`}
                         />
-                        <span>{label}</span>
+                        <span>{t(labelKey)}</span>
                       </div>
                     ))}
                   </div>
@@ -356,7 +357,7 @@ export default function UpgradePage() {
                       {isPaid && plan.tier === "full" ? <Crown className="h-4 w-4" /> : null}
                       {isPaid && plan.tier === "basic" ? <Zap className="h-4 w-4" /> : null}
                       {!isPaid ? <Check className="h-4 w-4" /> : null}
-                      {plan.cta}
+                      {t(plan.ctaKey)}
                     </button>
                   </div>
                 </motion.article>
@@ -366,10 +367,10 @@ export default function UpgradePage() {
         </section>
 
         <p className="pb-5 text-center text-[12px] leading-relaxed text-white/28">
-          İstediğin zaman iptal edebilirsin. Güvenli ödeme altyapısı aktif olduğunda
-          seçtiğin paketle devam edebilirsin.
+          {t("pricing.footer")}
         </p>
       </main>
     </div>
   );
 }
+

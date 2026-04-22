@@ -22,6 +22,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { SubscriptionTier } from "@/types/subscription";
 import { validateVoiceSampleFile } from "@/lib/voice/profile";
+import { useI18n } from "@/context/language-context";
 
 interface ParticipantStat {
   message_count: number;
@@ -106,6 +107,7 @@ async function compressImage(file: File): Promise<Blob> {
 
 function SelectPageContent() {
   const router = useRouter();
+  const { t } = useI18n();
 const params = useSearchParams();
 const exportId = params?.get("export_id") ?? "";
 const fileInputRef = useRef<HTMLInputElement>(null);
@@ -175,7 +177,7 @@ try {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Lütfen bir görsel seç");
+      toast.error(t("select.pickImage"));
       return;
     }
     setAvatarFile(file);
@@ -189,7 +191,7 @@ try {
     if (!file) return;
 
     if (subscriptionTier !== "full") {
-      toast.error("Ses profili yalnizca Full planda kullanilabilir");
+      toast.error(t("select.voiceLocked"));
       if (voiceInputRef.current) voiceInputRef.current.value = "";
       return;
     }
@@ -225,16 +227,16 @@ try {
       const data: unknown = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(getApiError(data) ?? "Ses profili hazirlanamadi");
+        throw new Error(getApiError(data) ?? t("select.voiceFailed"));
       }
 
       setVoiceUploadStatus("done");
-      toast.success("Ses profili hazirlandi");
+      toast.success(t("select.voiceDone"));
     } catch (error) {
       const message =
         error instanceof Error && error.message.trim()
           ? error.message
-          : "Ses profili hazirlanamadi";
+          : t("select.voiceFailed");
       console.warn("[voice-profile] upload failed", error);
       setVoiceUploadStatus("error");
       setVoiceError(message);
@@ -243,9 +245,9 @@ try {
   }
 
   async function handleCreate() {
-    if (!selectedTarget) { toast.error("Lütfen bir kişi seç"); return; }
-    if (!requesterName.trim()) { toast.error("Kendi adını gir"); return; }
-    if (!displayName.trim()) { toast.error("Profil adı gir"); return; }
+    if (!selectedTarget) { toast.error(t("select.pickPerson")); return; }
+    if (!requesterName.trim()) { toast.error(t("select.enterOwnName")); return; }
+    if (!displayName.trim()) { toast.error(t("select.enterProfileName")); return; }
 
     setLoading(true);
 
@@ -265,7 +267,7 @@ try {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error ?? "Profil oluşturulamadı");
+        toast.error(data.error ?? t("select.createFailed"));
         if (data.upgrade_required) router.push("/upgrade");
         return;
       }
@@ -315,16 +317,16 @@ try {
   const voiceUploadUnlocked = subscriptionTier === "full";
   const voiceStatusLabel =
     voiceUploadStatus === "uploading"
-      ? "Ses profili yukleniyor..."
+      ? t("select.voiceUploading")
       : voiceUploadStatus === "done"
-      ? "Ses profili hazir"
+      ? t("select.voiceDone")
       : voiceUploadStatus === "error"
-      ? voiceError ?? "Ses profili hazirlanamadi"
+      ? voiceError ?? t("select.voiceFailed")
       : voiceFile
-      ? "Yukleme icin hazir"
+      ? t("select.voiceReady")
       : voiceUploadUnlocked
-      ? "Istersen atlayabilirsin"
-      : "Full planda aktif";
+      ? t("select.voiceOptional")
+      : t("select.voiceLocked");
 
   return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col ambient-bg">
@@ -335,13 +337,14 @@ try {
             variant="ghost"
             size="icon"
             className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5"
+            aria-label={t("common.back")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="font-semibold text-sm">Kişi Seç</h1>
-          <p className="text-xs text-muted-foreground">Adım 2 / 3</p>
+          <h1 className="font-semibold text-sm">{t("select.title")}</h1>
+          <p className="text-xs text-muted-foreground">{t("select.step")}</p>
         </div>
       </div>
 
@@ -360,13 +363,13 @@ try {
         {/* Title */}
         <div className="rounded-3xl border border-primary/12 bg-card/45 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.18)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/70">
-            Kişi seçimi
+            {t("select.eyebrow")}
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight">
-            Kiminle sohbet etmek istiyorsun?
+            {t("select.hero")}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Sohbette {participants.length} kişi var. Aşağıdaki kartlardan konuşmak istediğin kişiyi seç.
+            {t("select.heroDesc", { count: participants.length })}
           </p>
         </div>
 
@@ -374,13 +377,13 @@ try {
         <div className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <Label className="text-sm font-semibold text-foreground/85">Kişiyi Seç</Label>
+              <Label className="text-sm font-semibold text-foreground/85">{t("select.choose")}</Label>
               <p className="mt-1 text-xs text-muted-foreground/60">
-                En çok mesaj atan kişiler üstte listelenir.
+                {t("select.chooseDesc")}
               </p>
             </div>
             <span className="rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1 text-[11px] font-medium text-primary/80">
-              {participants.length} kişi
+              {t("select.people", { count: participants.length })}
             </span>
           </div>
           <div className="space-y-2.5 rounded-3xl border border-white/8 bg-white/[0.03] p-2.5">
@@ -427,7 +430,7 @@ try {
                         <p className="truncate text-[15px] font-semibold text-foreground">{name}</p>
                         {isSelected && (
                           <span className="shrink-0 rounded-full border border-primary/25 bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            Seçildi
+                            {t("common.selected")}
                           </span>
                         )}
                       </div>
@@ -435,7 +438,7 @@ try {
                         <div className="mt-1.5 flex items-center gap-1.5">
                           <MessageCircle className="h-3.5 w-3.5 text-primary/65" />
                           <span className="text-xs font-medium text-muted-foreground/70">
-                            {formatMessageCount(msgCount)} mesaj
+                            {t("select.messages", { count: formatMessageCount(msgCount) })}
                           </span>
                         </div>
                       )}
@@ -485,15 +488,15 @@ try {
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground/80 mb-0.5">Profil Fotoğrafı</p>
+                <p className="text-sm font-medium text-foreground/80 mb-0.5">{t("select.profilePhoto")}</p>
                 <p className="text-xs text-muted-foreground/60 leading-relaxed">
-                  İsteğe bağlı — avatara tıklayarak ekle
+                  {t("select.photoDesc")}
                 </p>
                 {selectedStat && (
                   <div className="flex items-center gap-1 mt-1.5">
                     <MessageCircle className="h-3 w-3 text-primary/60" />
                     <span className="text-xs text-primary/70 font-medium">
-                      {formatMessageCount(selectedStat.message_count)} mesaj analiz edilecek
+                      {t("select.analyzeCount", { count: formatMessageCount(selectedStat.message_count) })}
                     </span>
                   </div>
                 )}
@@ -504,31 +507,31 @@ try {
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="requester" className="text-sm font-medium text-foreground/70">
-                  Sohbetteki Adın
+                  {t("select.yourChatName")}
                 </Label>
                 <Input
                   id="requester"
-                  placeholder="Sohbette nasıl görünüyorsun?"
+                  placeholder={t("select.yourChatNamePh")}
                   value={requesterName}
                   onChange={(e) => setRequesterName(e.target.value)}
                   className="bg-input/40 border-border/50 rounded-xl h-11 focus:border-primary/50 focus:ring-primary/15 placeholder:text-muted-foreground/50"
                 />
-                <p className="text-xs text-muted-foreground/60 pl-1">AI seni bu isimle tanır</p>
+                <p className="text-xs text-muted-foreground/60 pl-1">{t("select.yourChatNameHelp")}</p>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="displayName" className="text-sm font-medium text-foreground/70">
-                  Onun Sohbet Adı
+                  {t("select.theirChatName")}
                 </Label>
                 <Input
                   id="displayName"
-                  placeholder="Bu profilin adı"
+                  placeholder={t("select.theirChatNamePh")}
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   className="bg-input/40 border-border/50 rounded-xl h-11 focus:border-primary/50 focus:ring-primary/15 placeholder:text-muted-foreground/50"
                 />
                 <p className="text-xs text-muted-foreground/60 pl-1">
-                  İstersen farklı bir takma ad verebilirsin
+                  {t("select.theirChatNameHelp")}
                 </p>
               </div>
             </div>
@@ -554,14 +557,14 @@ try {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-foreground/85">
-                      Bu kişiye ait ses kaydı yükle
+                      {t("select.voiceTitle")}
                     </p>
                     {!voiceUploadUnlocked && (
                       <Lock className="h-3.5 w-3.5 text-muted-foreground/60" />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground/60 leading-relaxed mt-0.5">
-                    Ses dosyası en az 20 sn olmalıdır. Daha gerçekçi bir klon ses kaydı için 1 dakikadan az olmamalıdır.
+                    {t("select.voiceHelp")}
                   </p>
                 </div>
               </div>
@@ -578,11 +581,11 @@ try {
                   ) : (
                     <Upload className="h-3.5 w-3.5" />
                   )}
-                  {voiceFile ? "Dosyayı değiştir" : "Ses dosyası seç"}
+                  {voiceFile ? t("select.voiceChange") : t("select.voicePick")}
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-foreground/75 truncate">
-                    {voiceFile?.name ?? (voiceUploadUnlocked ? "MP3, WAV, M4A, WEBM" : "Yukleme kilitli")}
+                    {voiceFile?.name ?? (voiceUploadUnlocked ? t("select.voiceFormats") : t("select.voiceLocked"))}
                   </p>
                   <p
                     className={`text-[11px] truncate ${
@@ -611,24 +614,24 @@ try {
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="requester" className="text-sm font-medium text-foreground/70">
-                Sohbetteki Adın
+                {t("select.yourChatName")}
               </Label>
               <Input
                 id="requester"
-                placeholder="Sohbette nasıl görünüyorsun?"
+                placeholder={t("select.yourChatNamePh")}
                 value={requesterName}
                 onChange={(e) => setRequesterName(e.target.value)}
                 className="bg-input/40 border-border/50 rounded-xl h-11 focus:border-primary/50 focus:ring-primary/15 placeholder:text-muted-foreground/50"
               />
-              <p className="text-xs text-muted-foreground/60 pl-1">AI seni bu isimle tanır</p>
+              <p className="text-xs text-muted-foreground/60 pl-1">{t("select.yourChatNameHelp")}</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="displayName" className="text-sm font-medium text-foreground/70">
-                Onun Sohbet Adı
+                {t("select.theirChatName")}
               </Label>
               <Input
                 id="displayName"
-                placeholder="Bu profilin adı"
+                placeholder={t("select.theirChatNamePh")}
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="bg-input/40 border-border/50 rounded-xl h-11 focus:border-primary/50 focus:ring-primary/15 placeholder:text-muted-foreground/50"
@@ -647,14 +650,14 @@ try {
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               {voiceUploadStatus === "uploading"
-                ? "Ses profili yukleniyor..."
+                ? t("select.voiceUploading")
                 : avatarFile || voiceFile
-                ? "Kaydediliyor..."
-                : "Oluşturuluyor..."}
+                ? t("select.saving")
+                : t("select.creating")}
             </>
           ) : (
             <>
-              Devam Et, Onu Tanımaya Başla
+              {t("select.continue")}
               <ArrowRight className="h-4 w-4" />
             </>
           )}

@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { AppMenu } from "@/components/app/app-menu";
+import { useI18n } from "@/context/language-context";
 
 type InfoPageShellProps = {
   eyebrow: string;
@@ -9,7 +12,14 @@ type InfoPageShellProps = {
   children: React.ReactNode;
 };
 
-export function InfoPageShell({ eyebrow, title, subtitle, children }: InfoPageShellProps) {
+export function InfoPageShell({
+  eyebrow,
+  title,
+  subtitle,
+  children,
+}: InfoPageShellProps) {
+  const { t } = useI18n();
+
   return (
     <main className="min-h-screen bg-[#0B1220] text-foreground">
       <AppMenu floating />
@@ -22,11 +32,11 @@ export function InfoPageShell({ eyebrow, title, subtitle, children }: InfoPageSh
               className="inline-flex h-9 items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-3 text-xs font-semibold text-white/60 transition-colors hover:border-primary/25 hover:text-primary"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-              Geri
+              {t("common.back")}
             </Link>
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary">
               <MessageCircle className="h-3 w-3" />
-              Bendeki Sen
+              {t("common.appName")}
             </div>
           </div>
 
@@ -52,3 +62,4 @@ export function InfoCard({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+

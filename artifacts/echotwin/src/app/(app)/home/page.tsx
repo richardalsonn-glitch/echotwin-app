@@ -38,7 +38,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
-import { tr } from "date-fns/locale";
+import { enUS, ja, tr as trLocale } from "date-fns/locale";
 import {
   getUnreadCount,
   getLastMessage,
@@ -46,6 +46,8 @@ import {
   requestNotificationPermission,
   type LastMessage,
 } from "@/lib/notifications";
+import { useI18n } from "@/context/language-context";
+import type { Language, TranslationKey } from "@/lib/i18n";
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -62,23 +64,24 @@ function getFirstName(name: string): string {
   return name.split(/[\s@.]/)[0] ?? name;
 }
 
-function formatLastTime(isoStr: string): string {
+function formatLastTime(isoStr: string, language: Language, yesterday: string): string {
   const d = new Date(isoStr);
   if (isToday(d)) return format(d, "HH:mm");
-  if (isYesterday(d)) return "dün";
-  return format(d, "d MMM", { locale: tr });
+  if (isYesterday(d)) return yesterday;
+  const locale = language === "ja" ? ja : language === "en" ? enUS : trLocale;
+  return format(d, "d MMM", { locale });
 }
 
 function truncate(str: string, len = 46): string {
   return str.length > len ? str.slice(0, len).trimEnd() + "…" : str;
 }
 
-function getGreeting(): string {
+function getGreetingKey(): TranslationKey {
   const h = new Date().getHours();
-  if (h >= 5 && h < 12) return "Günaydın";
-  if (h >= 12 && h < 18) return "Merhaba";
-  if (h >= 18 && h < 22) return "İyi akşamlar";
-  return "İyi geceler";
+  if (h >= 5 && h < 12) return "home.goodMorning";
+  if (h >= 12 && h < 18) return "home.hello";
+  if (h >= 18 && h < 22) return "home.goodEvening";
+  return "home.goodNight";
 }
 
 function getAvatarColor(name: string) {
@@ -99,13 +102,13 @@ function getAvatarColor(name: string) {
 
 export default function HomePage() {
   const router = useRouter();
+  const { language, t } = useI18n();
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [lastMessages, setLastMessages] = useState<Record<string, LastMessage>>({});
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [userName, setUserName] = useState("");
-  const [greeting, setGreeting] = useState("");
 
   /* ── Sync local data ── */
   const syncLocalData = useCallback((ids: string[]) => {
@@ -179,7 +182,6 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    setGreeting(getGreeting());
     void loadPersonas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -197,16 +199,20 @@ export default function HomePage() {
 
   async function handleEnableNotifications() {
     const granted = await requestNotificationPermission();
-    toast.success(granted ? "Bildirimler açıldı" : "İzin verilmedi");
+    if (granted) {
+      toast.success(t("toast.notificationsOn"));
+    } else {
+      toast.error(t("toast.notificationsDenied"));
+    }
   }
 
   async function handleDelete(id: string) {
     const res = await fetch(`/api/personas/${id}`, { method: "DELETE" });
     if (res.ok) {
       setPersonas((prev) => prev.filter((p) => p.id !== id));
-      toast.success("Profil silindi");
+      toast.success(t("home.profileDeleted"));
     } else {
-      toast.error("Silinemedi");
+      toast.error(t("home.deleteFailed"));
     }
     setDeleteId(null);
   }
@@ -220,6 +226,7 @@ export default function HomePage() {
 
   const totalUnread = Object.values(unreadCounts).reduce((s, n) => s + n, 0);
   const lastVisited = sorted[0];
+  const greeting = t(getGreetingKey());
 
   /* ─────────────────────────────────────────────────────── */
 
@@ -229,7 +236,7 @@ export default function HomePage() {
       {/* ── Sticky top bar ── */}
       <div className="sticky top-0 z-20 px-5 py-3.5 flex items-center justify-between bg-transparent backdrop-blur-2xl border-b border-white/4">
         <AppMenu initialAuthenticated />
-        <span className="text-[13px] font-semibold gradient-text tracking-wide">Bendeki Sen</span>
+        <span className="text-[13px] font-semibold gradient-text tracking-wide">{t("common.appName")}</span>
         <div className="h-9 w-9" aria-hidden="true" />
       </div>
 
@@ -255,17 +262,17 @@ export default function HomePage() {
             </p>
             <h1 className="text-[28px] font-bold tracking-tight leading-tight text-foreground">
               {personas.length === 0
-                ? "Hâlâ seni bekliyor"
+                ? t("home.waiting")
                 : personas.length === 1
-                ? "Bağlantın hazır"
-                : `${personas.length} bağlantın var`}
+                  ? t("home.ready")
+                  : t("home.connections", { count: personas.length })}
             </h1>
             <p className="text-[13.5px] text-muted-foreground/70 mt-1.5 leading-relaxed">
               {personas.length === 0
-                ? "Bir sohbet yükle, gerisi bizde."
+                ? t("home.uploadPrompt")
                 : totalUnread > 0
-                ? `${totalUnread} okunmamış mesajın var.`
-                : "Tüm mesajlar okundu."}
+                  ? t("home.unread", { count: totalUnread })
+                  : t("home.allRead")}
             </p>
           </motion.div>
 
@@ -279,12 +286,12 @@ export default function HomePage() {
             >
               <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/8 text-[12px] text-foreground/70">
                 <User className="h-3 w-3 text-primary/70" />
-                {personas.length} profil
+                {t("home.profiles", { count: personas.length })}
               </span>
               {totalUnread > 0 && (
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-[12px] text-primary font-medium">
                   <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse inline-block" />
-                  {totalUnread} okunmamış
+                  {t("home.unread", { count: totalUnread })}
                 </span>
               )}
             </motion.div>
@@ -295,7 +302,7 @@ export default function HomePage() {
         {lastVisited && (
           <div className="px-5 mb-6">
             <p className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider mb-3">
-              Hızlı Erişim
+              {t("home.quickAccess")}
             </p>
             <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1">
               <button
@@ -303,12 +310,12 @@ export default function HomePage() {
                 onClick={() => router.push(`/chat/${lastVisited.id}`)}
               >
                 <MessageCircle className="h-3.5 w-3.5 text-primary/70 shrink-0" />
-                <span className="truncate max-w-[90px]">Son: {lastVisited.display_name}</span>
+                <span className="truncate max-w-[90px]">{t("home.last", { name: lastVisited.display_name })}</span>
               </button>
               <Link href="/upgrade">
                 <button className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/8 text-[12.5px] text-amber-400/90 shrink-0 hover:bg-amber-500/15 transition-all active:scale-95">
                   <Crown className="h-3.5 w-3.5 shrink-0" />
-                  Premium
+                  {t("home.premium")}
                 </button>
               </Link>
               <button
@@ -316,7 +323,7 @@ export default function HomePage() {
                 onClick={handleEnableNotifications}
               >
                 <Bell className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-                Bildirimler
+                {t("home.notifications")}
               </button>
             </div>
           </div>
@@ -367,12 +374,12 @@ export default function HomePage() {
               </div>
 
               <h2 className="text-[22px] font-bold tracking-tight mb-3 leading-tight">
-                Bir sohbet yükle,
+                {t("home.emptyTitleLine1")}
                 <br />
-                <span className="gradient-text">gerisi bizde.</span>
+                <span className="gradient-text">{t("home.emptyTitleLine2")}</span>
               </h2>
               <p className="text-muted-foreground/65 text-[13.5px] leading-relaxed mb-8 max-w-[260px]">
-                WhatsApp sohbetini yükle — sanki o hâlâ karşındaymış gibi konuşmana yardım edelim.
+                {t("home.emptyDesc")}
               </p>
               <Link href="/onboarding/upload">
                 <button
@@ -383,7 +390,7 @@ export default function HomePage() {
                   }}
                 >
                   <Plus className="h-4 w-4" />
-                  İlk Kişiyi Ekle
+                  {t("home.addFirst")}
                 </button>
               </Link>
             </motion.div>
@@ -391,7 +398,7 @@ export default function HomePage() {
             /* ── Conversation list ── */
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground/50 uppercase tracking-wider mb-3">
-                Konuşmalar
+                {t("home.conversations")}
               </p>
               <AnimatePresence initial={false}>
                 <div className="space-y-2.5">
@@ -468,7 +475,7 @@ export default function HomePage() {
                               </span>
                               {!hasAnalysis && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-muted-foreground/45 shrink-0">
-                                  analiz bekleniyor
+                                  {t("home.analysisPending")}
                                 </span>
                               )}
                             </div>
@@ -482,13 +489,13 @@ export default function HomePage() {
                                 }`}
                               >
                                 {lastMsg.role === "user" && (
-                                  <span className="text-muted-foreground/40">Sen: </span>
+                                  <span className="text-muted-foreground/40">{t("home.you")} </span>
                                 )}
                                 {truncate(lastMsg.content)}
                               </p>
                             ) : (
                               <p className="text-[12px] text-muted-foreground/40 italic">
-                                Merhaba de, seni bekliyor…
+                                {t("home.sayHello")}
                               </p>
                             )}
                           </div>
@@ -500,7 +507,7 @@ export default function HomePage() {
                                 unread > 0 ? "text-primary" : "text-muted-foreground/35"
                               }`}
                             >
-                              {lastMsg ? formatLastTime(lastMsg.created_at) : ""}
+                              {lastMsg ? formatLastTime(lastMsg.created_at, language, t("home.yesterday")) : ""}
                             </span>
 
                             <div className="flex items-center gap-1">
@@ -533,7 +540,7 @@ export default function HomePage() {
                                     className="rounded-xl gap-2.5 text-sm py-2.5"
                                   >
                                     <User className="h-4 w-4 text-muted-foreground" />
-                                    Profili Düzenle
+                                    {t("home.editProfile")}
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="text-destructive rounded-xl gap-2.5 text-sm py-2.5"
@@ -543,7 +550,7 @@ export default function HomePage() {
                                     }}
                                   >
                                     <Trash2 className="h-4 w-4" />
-                                    Sil
+                                    {t("home.delete")}
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -582,10 +589,10 @@ export default function HomePage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[13.5px] text-amber-200/90 leading-tight">
-                        Premium&apos;a Geç
+                        {t("home.upgradeTitle")}
                       </p>
                       <p className="text-[12px] text-amber-500/60 mt-0.5">
-                        Sınırsız mesaj ve daha fazlası
+                        {t("home.upgradeDesc")}
                       </p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-amber-500/50 shrink-0" />
@@ -610,7 +617,7 @@ export default function HomePage() {
               }}
             >
               <Plus className="h-4 w-4" />
-              Yeni Kişi Ekle
+              {t("home.addNew")}
             </motion.button>
           </Link>
         </div>
@@ -620,18 +627,18 @@ export default function HomePage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent className="bg-card border-border/60 rounded-3xl shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Profili Sil</AlertDialogTitle>
+            <AlertDialogTitle>{t("home.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Bu profil ve tüm konuşma geçmişi kalıcı olarak silinecek. Emin misin?
+              {t("home.deleteDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-2xl border-border/60">İptal</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-2xl border-border/60">{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="rounded-2xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteId && handleDelete(deleteId)}
             >
-              Sil
+              {t("home.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  BookOpen,
   Bell,
   BellOff,
+  BookOpen,
   ChevronRight,
   CircleHelp,
   Crown,
@@ -16,7 +16,9 @@ import {
   MessageCircle,
   Sparkles,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
+import { LanguageSwitcher } from "@/components/app/language-switcher";
 import {
   Sheet,
   SheetContent,
@@ -25,16 +27,15 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  createClient,
-  hasSupabaseBrowserConfig,
-} from "@/lib/supabase/client";
+import { useI18n } from "@/context/language-context";
 import {
   areBrowserNotificationsEnabled,
   requestNotificationPermission,
   setBrowserNotificationsEnabled,
 } from "@/lib/notifications";
+import { createClient, hasSupabaseBrowserConfig } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import type { TranslationKey } from "@/lib/i18n";
 
 type AppMenuProps = {
   initialAuthenticated?: boolean;
@@ -43,35 +44,42 @@ type AppMenuProps = {
   floating?: boolean;
 };
 
-const MENU_ITEMS = [
+type MenuItem = {
+  href: string;
+  labelKey: TranslationKey;
+  descriptionKey: TranslationKey;
+  icon: LucideIcon;
+};
+
+const MENU_ITEMS: MenuItem[] = [
   {
     href: "/hakkimizda",
-    label: "Hakkımızda",
-    description: "Ürünün hikayesi ve amacı",
+    labelKey: "menu.about",
+    descriptionKey: "menu.aboutDesc",
     icon: BookOpen,
   },
   {
-    href: "/merak-edilenler",
-    label: "Merak Edilenler",
-    description: "Sık sorulan sorular",
-    icon: CircleHelp,
-  },
-  {
     href: "/ne-ise-yariyor",
-    label: "Bu uygulama ne işe yarıyor?",
-    description: "Çalışma mantığını keşfet",
+    labelKey: "menu.how",
+    descriptionKey: "menu.howDesc",
     icon: Sparkles,
   },
   {
+    href: "/merak-edilenler",
+    labelKey: "menu.faq",
+    descriptionKey: "menu.faqDesc",
+    icon: CircleHelp,
+  },
+  {
     href: "/upgrade",
-    label: "Üyelik Paketleri",
-    description: "Planları ve özellikleri gör",
+    labelKey: "menu.pricing",
+    descriptionKey: "menu.pricingDesc",
     icon: Crown,
   },
   {
     href: "/destek",
-    label: "Destek",
-    description: "Sorununu bize ilet",
+    labelKey: "menu.support",
+    descriptionKey: "menu.supportDesc",
     icon: LifeBuoy,
   },
 ];
@@ -84,6 +92,7 @@ export function AppMenu({
 }: AppMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useI18n();
   const currentPath = pathname ?? "";
   const [open, setOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuthenticated);
@@ -134,7 +143,7 @@ export function AppMenu({
 
   async function handleLogout() {
     if (!hasSupabaseBrowserConfig()) {
-      toast.error("Oturum servisi su an yapilandirilmamis.");
+      toast.error(t("menu.authServiceMissing"));
       return;
     }
 
@@ -150,7 +159,7 @@ export function AppMenu({
     if (notificationsOn) {
       setBrowserNotificationsEnabled(false);
       setNotificationsOn(false);
-      toast.success("Bildirimler kapalı");
+      toast.success(t("toast.notificationsOff"));
       return;
     }
 
@@ -158,16 +167,16 @@ export function AppMenu({
     setNotificationsOn(granted);
 
     if (granted) {
-      toast.success("Bildirimler açık");
+      toast.success(t("toast.notificationsOn"));
     } else {
-      toast.error("Bildirim izni verilmedi. Tarayıcı ayarlarından açabilirsin.");
+      toast.error(t("toast.notificationsDenied"));
     }
   }
 
-  const authTitle = isAuthenticated ? "Hesabın açık" : "Hesabınla devam et";
+  const authTitle = isAuthenticated ? t("menu.authOpen") : t("menu.authClosed");
   const authDescription = isAuthenticated
-    ? "Oturumunu buradan güvenle kapatabilirsin."
-    : "Sohbetlerini ve personanı kaydetmek için giriş yap.";
+    ? t("menu.authOpenDesc")
+    : t("menu.authClosedDesc");
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -175,7 +184,7 @@ export function AppMenu({
         <SheetTrigger asChild>
           <button
             type="button"
-            aria-label="Menüyü aç"
+            aria-label={t("menu.open")}
             className={cn(
               "flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] text-white/80 shadow-[0_0_22px_rgba(20,184,166,0.12)] backdrop-blur-xl transition-all hover:border-primary/35 hover:bg-primary/10 hover:text-primary active:scale-95",
               triggerClassName
@@ -200,17 +209,17 @@ export function AppMenu({
               </div>
               <div>
                 <SheetTitle className="text-[17px] font-bold tracking-tight text-white">
-                  Bendeki Sen
+                  {t("common.appName")}
                 </SheetTitle>
                 <SheetDescription className="text-xs text-white/45">
-                  Kişisel sohbet deneyimin
+                  {t("menu.personalExperience")}
                 </SheetDescription>
               </div>
             </div>
 
             <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
               <p className="text-xs font-medium leading-relaxed text-white/58">
-                Geçmiş konuşmalarından daha kişisel, daha bağlamsal ve daha tanıdık bir sohbet alanı.
+                {t("menu.tagline")}
               </p>
             </div>
           </SheetHeader>
@@ -243,9 +252,11 @@ export function AppMenu({
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-white/88">{item.label}</span>
+                    <span className="block text-sm font-semibold text-white/88">
+                      {t(item.labelKey)}
+                    </span>
                     <span className="mt-0.5 block truncate text-[11.5px] text-white/40">
-                      {item.description}
+                      {t(item.descriptionKey)}
                     </span>
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-primary/70" />
@@ -255,6 +266,8 @@ export function AppMenu({
           </nav>
 
           <div className="border-t border-white/8 bg-black/18 p-4">
+            <LanguageSwitcher compact className="mb-3" />
+
             <button
               type="button"
               onClick={handleToggleNotifications}
@@ -266,12 +279,12 @@ export function AppMenu({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-white/86">
-                  {notificationsOn ? "Bildirimler Açık" : "Bildirimler Kapalı"}
+                  {notificationsOn ? t("menu.notificationsOn") : t("menu.notificationsOff")}
                 </span>
                 <span className="mt-0.5 block text-xs leading-relaxed text-white/42">
                   {notificationsSupported
-                    ? "Yeni mesaj uyarılarını buradan yönet."
-                    : "Bu tarayıcı bildirimleri desteklemiyor."}
+                    ? t("menu.notificationsDesc")
+                    : t("menu.notificationsUnsupported")}
                 </span>
               </span>
             </button>
@@ -288,7 +301,7 @@ export function AppMenu({
                 className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 text-sm font-semibold text-red-200 transition-colors hover:bg-red-500/15"
               >
                 <LogOut className="h-4 w-4" />
-                Çıkış Yap
+                {t("menu.logout")}
               </button>
             ) : (
               <button
@@ -297,7 +310,7 @@ export function AppMenu({
                 className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-[0_0_24px_rgba(20,184,166,0.24)] transition-opacity hover:opacity-90"
               >
                 <LogIn className="h-4 w-4" />
-                Giriş Yap
+                {t("auth.login")}
               </button>
             )}
           </div>
@@ -306,3 +319,4 @@ export function AppMenu({
     </Sheet>
   );
 }
+

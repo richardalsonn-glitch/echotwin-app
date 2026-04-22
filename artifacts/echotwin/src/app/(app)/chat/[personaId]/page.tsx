@@ -27,7 +27,7 @@ import {
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, formatDistanceToNow } from "date-fns";
-import { tr } from "date-fns/locale";
+import { enUS, ja, tr as trLocale } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/client";
 import {
   createAudioFile,
@@ -49,6 +49,8 @@ import {
   showBrowserNotification,
   requestNotificationPermission,
 } from "@/lib/notifications";
+import { useI18n } from "@/context/language-context";
+import type { Language } from "@/lib/i18n";
 
 const FREE_LIMIT = 5;
 
@@ -105,14 +107,24 @@ function TickIcon({ status }: { status: MessageStatus }) {
 function PresenceLabel({
   presence,
   lastSeenAt,
+  language,
+  typingLabel,
+  onlineLabel,
+  lastSeenTodayLabel,
+  lastSeenLabel,
 }: {
   presence: PresenceState;
   lastSeenAt: Date;
+  language: Language;
+  typingLabel: string;
+  onlineLabel: string;
+  lastSeenTodayLabel: (time: string) => string;
+  lastSeenLabel: (time: string) => string;
 }) {
   if (presence === "typing") {
     return (
       <span className="text-primary font-medium inline-flex items-center gap-0.5">
-        yazıyor
+        {typingLabel}
         <span className="inline-flex gap-0.5 ml-1">
           <span className="typing-dot h-[3px] w-[3px] rounded-full bg-primary" />
           <span className="typing-dot h-[3px] w-[3px] rounded-full bg-primary" />
@@ -122,16 +134,16 @@ function PresenceLabel({
     );
   }
   if (presence === "online" || presence === "recent_online") {
-    return <span className="text-green-400">çevrimiçi</span>;
+    return <span className="text-green-400">{onlineLabel}</span>;
   }
   const now = new Date();
   const isToday = lastSeenAt.toDateString() === now.toDateString();
   const timeStr = format(lastSeenAt, "HH:mm");
+  const locale = language === "ja" ? ja : language === "en" ? enUS : trLocale;
+  const relativeTime = formatDistanceToNow(lastSeenAt, { locale, addSuffix: true });
   return (
     <span className="text-muted-foreground">
-      {isToday
-        ? `son görülme bugün ${timeStr}`
-        : `son görülme ${formatDistanceToNow(lastSeenAt, { locale: tr, addSuffix: true })}`}
+      {isToday ? lastSeenTodayLabel(timeStr) : lastSeenLabel(relativeTime)}
     </span>
   );
 }
@@ -151,11 +163,11 @@ function getTranscribedText(value: unknown): string | null {
   return typeof data.text === "string" && data.text.trim() ? data.text.trim() : null;
 }
 
-function getTranscribeError(value: unknown): string {
+function getTranscribeError(value: unknown, fallback: string): string {
   const data = getObjectValue(value);
   return typeof data.error === "string" && data.error.trim()
     ? data.error.trim()
-    : "Ses mesajı okunamadı, tekrar dene";
+    : fallback;
 }
 
 function getImageMemoryNote(message: ChatMessage): string | null {
@@ -245,6 +257,7 @@ export default function ChatPage({
 }) {
   const { personaId } = use(params);
   const router = useRouter();
+  const { language, t } = useI18n();
   const messagesViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -585,7 +598,7 @@ export default function ChatPage({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error ?? "Başlatılamadı");
+        toast.error(err.error ?? t("chat.startFailed"));
         setPresence("idle");
         return;
       }
@@ -759,11 +772,11 @@ export default function ChatPage({
       const audioBlob = await stopAudioRecording(session);
 
       if (audioBlob.size < MIN_AUDIO_BYTES) {
-        throw new Error("Ses mesajı okunamadı, tekrar dene");
+        throw new Error(t("chat.voiceUnreadable"));
       }
 
       if (audioBlob.size > MAX_AUDIO_BYTES) {
-        throw new Error("Ses kaydı çok uzun, daha kısa tekrar dene");
+        throw new Error(t("chat.voiceTooLong"));
       }
 
       setRecordingElapsedMs(durationMs);
@@ -780,7 +793,7 @@ export default function ChatPage({
       const rawMessage = error instanceof Error ? error.message : "";
       const message = rawMessage.startsWith("Ses ")
         ? rawMessage
-        : "Ses mesajı okunamadı, tekrar dene";
+        : t("chat.voiceUnreadable");
       resetVoiceInputAfterError(message);
       toast.error(message);
     }
@@ -794,11 +807,11 @@ export default function ChatPage({
 
     try {
       if (voicePreview.sizeBytes < MIN_AUDIO_BYTES) {
-        throw new Error("Ses mesajı okunamadı, tekrar dene");
+        throw new Error(t("chat.voiceUnreadable"));
       }
 
       if (voicePreview.sizeBytes > MAX_AUDIO_BYTES) {
-        throw new Error("Ses kaydı çok uzun, daha kısa tekrar dene");
+        throw new Error(t("chat.voiceTooLong"));
       }
 
       const formData = new FormData();
@@ -812,12 +825,12 @@ export default function ChatPage({
       const data: unknown = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(getTranscribeError(data));
+        throw new Error(getTranscribeError(data, t("chat.voiceUnreadable")));
       }
 
       const transcript = getTranscribedText(data);
       if (!transcript) {
-        throw new Error("Ses mesajı okunamadı, tekrar dene");
+        throw new Error(t("chat.voiceUnreadable"));
       }
 
       setVoiceError(null);
@@ -829,7 +842,7 @@ export default function ChatPage({
       const rawMessage = error instanceof Error ? error.message : "";
       const message = rawMessage.startsWith("Ses ")
         ? rawMessage
-        : "Ses mesajı okunamadı, tekrar dene";
+        : t("chat.voiceUnreadable");
       resetVoiceInputAfterError(message);
       toast.error(message);
     }
@@ -863,7 +876,7 @@ export default function ChatPage({
           voicePreviewAudioRef.current = null;
           setPreviewPlaying(false);
         }
-        toast.error("Ses kaydı oynatılamadı");
+        toast.error(t("chat.voicePlaybackFailed"));
       };
     }
 
@@ -873,7 +886,7 @@ export default function ChatPage({
     } catch (error) {
       console.warn("[voice-input] preview playback failed", error);
       stopVoicePreviewPlayback();
-      toast.error("Ses kaydı oynatılamadı");
+      toast.error(t("chat.voicePlaybackFailed"));
     }
   }
 
@@ -910,7 +923,7 @@ export default function ChatPage({
         voiceAudioRef.current = null;
         setPlayingVoiceMessageId(null);
       }
-      toast.error("Sesli mesaj oynatilamadi");
+      toast.error(t("chat.voiceMessagePlaybackFailed"));
     };
 
     try {
@@ -918,7 +931,7 @@ export default function ChatPage({
     } catch (error) {
       console.warn("[voice-message] playback failed", error);
       stopVoicePlayback();
-      toast.error("Sesli mesaj oynatilamadi");
+      toast.error(t("chat.voiceMessagePlaybackFailed"));
     }
   }
 
@@ -955,7 +968,7 @@ export default function ChatPage({
           : p
       );
       onResponseDelivered(
-        "Sesli mesaj",
+        t("chat.voiceMessage"),
         persona?.display_name ?? "AI",
         persona?.avatar_url ?? undefined
       );
@@ -1006,7 +1019,7 @@ export default function ChatPage({
 
       if (!res.ok) {
         if (payload.limit_reached) setLimitReached(true);
-        toast.error(typeof payload.error === "string" ? payload.error : "Fotograf gonderilemedi");
+        toast.error(typeof payload.error === "string" ? payload.error : t("chat.photoSendFailed"));
         return;
       }
 
@@ -1050,7 +1063,7 @@ export default function ChatPage({
       }, 4000);
     } catch (error) {
       console.warn("[chat-photo] send failed", error);
-      toast.error("Fotograf gonderilemedi, tekrar dene");
+      toast.error(t("chat.photoSendFailed"));
       setPresence("idle");
     } finally {
       setSending(false);
@@ -1116,7 +1129,7 @@ export default function ChatPage({
           setLimitReached(true);
           toast.error(data.error);
         } else {
-          toast.error(data.error ?? "Mesaj gönderilemedi");
+          toast.error(data.error ?? t("chat.messageSendFailed"));
         }
         setMessages((prev) => prev.filter((m) => m.id !== optId));
         clearPresenceTimer();
@@ -1401,9 +1414,9 @@ export default function ChatPage({
     presence === "typing";
   const voiceStatusText =
     photoStatus === "uploading"
-      ? "Fotoğraf yükleniyor..."
+      ? t("chat.photoUploading")
       : voiceStatus === "transcribing" || voiceStatus === "sending"
-      ? "Ses çözümleniyor..."
+      ? t("chat.transcribing")
       : voiceError;
   const textSendDisabled =
     !input.trim() || sending || voiceStatus !== "idle" || photoStatus !== "idle";
@@ -1474,9 +1487,17 @@ export default function ChatPage({
           </p>
           <p className="text-[11.5px] mt-[1px] leading-none">
             {mounted ? (
-              <PresenceLabel presence={presence} lastSeenAt={lastSeenAt} />
+              <PresenceLabel
+                presence={presence}
+                lastSeenAt={lastSeenAt}
+                language={language}
+                typingLabel={t("chat.typing")}
+                onlineLabel={t("chat.online")}
+                lastSeenTodayLabel={(time) => t("chat.lastSeenToday", { time })}
+                lastSeenLabel={(time) => t("chat.lastSeen", { time })}
+              />
             ) : (
-              <span className="text-muted-foreground/60">yükleniyor…</span>
+              <span className="text-muted-foreground/60">{t("chat.loading")}</span>
             )}
           </p>
         </button>
@@ -1519,7 +1540,7 @@ export default function ChatPage({
             </div>
             <p className="font-bold text-[17px] text-white/90 tracking-tight">{persona.display_name}</p>
             <p className="text-white/42 text-[13.5px] mt-2 leading-relaxed max-w-[240px]">
-              Sohbet henüz başlamadı
+              {t("chat.notStarted")}
             </p>
 
             <div className="mt-7 flex flex-col gap-2.5 w-full max-w-[240px]">
@@ -1529,7 +1550,7 @@ export default function ChatPage({
                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
                 onClick={() => inputRef.current?.focus()}
               >
-                Sohbeti ben başlatayım
+                {t("chat.startSelf")}
               </button>
               <button
                 type="button"
@@ -1545,10 +1566,10 @@ export default function ChatPage({
                 {startingConvo ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Bekliyor…
+                    {t("chat.waiting")}
                   </>
                 ) : (
-                  "Sohbeti o başlatsın"
+                  t("chat.startThem")
                 )}
               </button>
             </div>
@@ -1610,7 +1631,7 @@ export default function ChatPage({
                     <div className="space-y-2">
                       <img
                         src={msg.image_url ?? ""}
-                        alt="Gönderilen fotoğraf"
+                        alt={t("chat.photoAlt")}
                         className="max-h-72 w-full rounded-[16px] border border-white/10 object-cover shadow-[0_12px_30px_rgba(0,0,0,0.20)]"
                         loading="lazy"
                       />
@@ -1620,14 +1641,14 @@ export default function ChatPage({
                         </p>
                       )}
                       <div className="media-memory-note rounded-2xl px-3 py-2 text-[11.5px] leading-relaxed">
-                        {imageMemoryNote ?? "Fotoğraf analiz edildi ve sohbet bağlamına eklendi."}
+                        {imageMemoryNote ?? t("chat.mediaContext")}
                       </div>
                     </div>
                   ) : isVoiceMessage ? (
                     <div className="flex items-center gap-2.5">
                       <button
                         type="button"
-                        aria-label={isPlayingVoice ? "Sesli mesajı duraklat" : "Sesli mesajı oynat"}
+                        aria-label={isPlayingVoice ? t("chat.voicePause") : t("chat.voicePlay")}
                         className="premium-pressable h-10 w-10 rounded-full bg-primary/18 border border-primary/28 flex items-center justify-center shrink-0 shadow-[0_0_18px_rgba(20,184,166,0.10)]"
                         onClick={() => void toggleVoicePlayback(msg)}
                       >
@@ -1640,7 +1661,7 @@ export default function ChatPage({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <AudioLines className="h-3.5 w-3.5 text-primary/80 shrink-0" />
-                          <span className="text-[13px] font-medium text-white/86">Sesli mesaj</span>
+                          <span className="text-[13px] font-medium text-white/86">{t("chat.voiceMessage")}</span>
                         </div>
                         <div className="mt-1.5 h-6 flex items-center gap-[3px]" aria-hidden="true">
                           {[10, 16, 22, 13, 19, 25, 15, 21, 12, 18, 24, 14].map((height, waveIndex) => (
@@ -1767,9 +1788,9 @@ export default function ChatPage({
                 <Lock className="h-4 w-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[13.5px] text-white/90">Mesaj Hakkın Bitti</p>
+                <p className="font-semibold text-[13.5px] text-white/90">{t("chat.limitTitle")}</p>
                 <p className="text-[12px] text-white/45 mt-0.5 leading-relaxed">
-                  Ücretsiz {FREE_LIMIT} mesaj hakkını kullandın. Konuşmaya devam etmek için bir plan seç.
+                  {t("chat.limitDesc", { count: FREE_LIMIT })}
                 </p>
               </div>
             </div>
@@ -1782,7 +1803,7 @@ export default function ChatPage({
                 }}
               >
                 <Crown className="h-3.5 w-3.5" />
-                Premium&apos;a Geç
+                {t("chat.upgrade")}
               </button>
             </Link>
           </motion.div>
@@ -1819,7 +1840,7 @@ export default function ChatPage({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-[13px] font-semibold text-white/90">
-                          {voiceStatus === "stopping" ? "Kayıt hazırlanıyor..." : "Dinliyorum..."}
+                          {voiceStatus === "stopping" ? t("chat.recordPreparing") : t("chat.listen")}
                         </p>
                         <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-white/78">
                           {formatVoiceDuration(recordingElapsedMs)}
@@ -1838,8 +1859,8 @@ export default function ChatPage({
                     </div>
                     <button
                       type="button"
-                      aria-label="Kaydı bitir"
-                      title="Kaydı bitir"
+                      aria-label={t("chat.voiceFinish")}
+                      title={t("chat.voiceFinish")}
                       disabled={voiceStatus === "stopping"}
                       onClick={() => void finishVoiceRecording()}
                       className="premium-pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-400/30 bg-red-500/14 text-red-200 disabled:opacity-50"
@@ -1858,8 +1879,8 @@ export default function ChatPage({
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
-                        aria-label={previewPlaying ? "Ön izlemeyi duraklat" : "Ön izlemeyi oynat"}
-                        title={previewPlaying ? "Duraklat" : "Dinle"}
+                        aria-label={previewPlaying ? t("chat.voicePause") : t("chat.voicePlay")}
+                        title={previewPlaying ? t("chat.voicePause") : t("chat.voicePlay")}
                         onClick={() => void toggleVoicePreviewPlayback()}
                         className="premium-pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/30 bg-primary/14 text-primary shadow-[0_0_18px_rgba(20,184,166,0.12)]"
                       >
@@ -1872,7 +1893,7 @@ export default function ChatPage({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">
                           <p className="truncate text-[13px] font-semibold text-white/90">
-                            Göndermeden önce dinle
+                            {t("chat.previewTitle")}
                           </p>
                           <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-white/78">
                             {formatVoiceDuration(voicePreview.durationMs)}
@@ -1899,7 +1920,7 @@ export default function ChatPage({
                         className="premium-pressable flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-white/8 bg-white/6 text-[12px] font-medium text-white/70"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        Sil
+                        {t("chat.delete")}
                       </button>
                       <button
                         type="button"
@@ -1907,7 +1928,7 @@ export default function ChatPage({
                         className="premium-pressable flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-white/8 bg-white/6 text-[12px] font-medium text-white/70"
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
-                        Yeniden
+                        {t("chat.restart")}
                       </button>
                       <button
                         type="button"
@@ -1915,7 +1936,7 @@ export default function ChatPage({
                         className="premium-pressable flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary text-[12px] font-semibold text-primary-foreground shadow-[0_0_18px_rgba(20,184,166,0.22)]"
                       >
                         <Send className="h-3.5 w-3.5" />
-                        Gönder
+                        {t("chat.send")}
                       </button>
                     </div>
                   </div>
@@ -1927,9 +1948,9 @@ export default function ChatPage({
                       <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-white/90">Ses çözümleniyor...</p>
+                      <p className="text-[13px] font-semibold text-white/90">{t("chat.transcribing")}</p>
                       <p className="mt-0.5 text-[12px] leading-relaxed text-white/45">
-                        Metne çevrilince normal mesaj olarak gönderilecek.
+                        {t("chat.transcribingDesc")}
                       </p>
                     </div>
                   </div>
@@ -1951,7 +1972,7 @@ export default function ChatPage({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-white/90">
-                      Fotoğraf hazırlanıyor...
+                      {t("chat.photoUploading")}
                     </p>
                     <div className="photo-loading-shimmer mt-2 h-1.5 overflow-hidden rounded-full" />
                   </div>
@@ -1964,7 +1985,7 @@ export default function ChatPage({
             <div className="flex-1 relative">
               <Input
                 ref={inputRef}
-                placeholder="Mesaj yaz…"
+                placeholder={t("chat.messagePlaceholder")}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -1987,8 +2008,8 @@ export default function ChatPage({
             </div>
             <button
               type="button"
-              aria-label="Fotoğraf gönder"
-              title="Fotoğraf gönder"
+              aria-label={t("chat.photoSend")}
+              title={t("chat.photoSend")}
               className="premium-pressable h-11 w-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{
                 background:
@@ -2008,8 +2029,8 @@ export default function ChatPage({
             </button>
             <button
               type="button"
-              aria-label={voiceStatus === "recording" ? "Kaydı bitir" : "Sesli mesaj kaydet"}
-              title={voiceStatus === "recording" ? "Kaydı bitir" : "Sesli mesaj kaydet"}
+              aria-label={voiceStatus === "recording" ? t("chat.voiceFinish") : t("chat.voiceRecord")}
+              title={voiceStatus === "recording" ? t("chat.voiceFinish") : t("chat.voiceRecord")}
               className="premium-pressable h-11 w-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{
                 background:

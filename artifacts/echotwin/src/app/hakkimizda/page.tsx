@@ -1,49 +1,44 @@
-import { InfoCard, InfoPageShell } from "@/components/app/info-page-shell";
+"use client";
 
-const HIGHLIGHTS = [
-  "Geçmiş sohbetlerden persona analizi",
-  "Daha kişisel ve bağlamsal yanıtlar",
-  "Ses, metin ve hafıza temelli deneyim",
-  "Premium kullanıcılar için gelişmiş özellikler",
+import { InfoCard, InfoPageShell } from "@/components/app/info-page-shell";
+import { useI18n } from "@/context/language-context";
+import type { TranslationKey } from "@/lib/i18n";
+
+const HIGHLIGHTS: TranslationKey[] = [
+  "info.highlight.0",
+  "info.highlight.1",
+  "info.highlight.2",
+  "info.highlight.3",
 ];
 
 export default function AboutPage() {
+  const { t } = useI18n();
+
   return (
     <InfoPageShell
-      eyebrow="Hakkımızda"
-      title="Bendeki Sen"
-      subtitle="Birinin konuşma izini yeniden hissetmek için tasarlandı."
+      eyebrow={t("info.aboutEyebrow")}
+      title={t("info.aboutTitle")}
+      subtitle={t("info.aboutSubtitle")}
     >
       <InfoCard>
         <div className="space-y-4 text-sm leading-relaxed text-white/62">
-          <p>
-            Bendeki Sen, geçmiş sohbetlerinden bir kişinin konuşma tarzını, kelime
-            alışkanlıklarını ve sana karşı yaklaşımını analiz ederek daha gerçekçi bir
-            sohbet deneyimi sunmak için geliştirildi.
-          </p>
-          <p>
-            Bu uygulama, yalnızca mesaj üretmeyi değil; bir kişiyi hatırlama, yeniden
-            konuşma, olası tepkilerini görme ve geçmiş iletişimin tonunu yeniden hissetme
-            fikri üzerine kuruldu.
-          </p>
-          <p>
-            İster birini anmak iste, ister yarım kalmış bir konuşmayı zihninde tamamlamak
-            iste, istersen de sadece “buna ne derdi?” diye merak et; Bendeki Sen bu
-            deneyimi daha kişisel ve daha anlamlı hale getirmeyi amaçlar.
-          </p>
+          <p>{t("info.aboutBody1")}</p>
+          <p>{t("info.aboutBody2")}</p>
+          <p>{t("info.aboutBody3")}</p>
         </div>
       </InfoCard>
 
       <div className="grid grid-cols-1 gap-3">
-        {HIGHLIGHTS.map((item) => (
+        {HIGHLIGHTS.map((key) => (
           <div
-            key={item}
+            key={key}
             className="rounded-2xl border border-primary/15 bg-primary/[0.07] px-4 py-3 text-sm font-medium text-white/78"
           >
-            {item}
+            {t(key)}
           </div>
         ))}
       </div>
     </InfoPageShell>
   );
 }
+

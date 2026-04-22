@@ -2,13 +2,22 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { loginAction } from "./actions";
+import { AlertCircle, Loader2, LogIn, Mail } from "lucide-react";
+import { useI18n } from "@/context/language-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, LogIn, Mail, AlertCircle } from "lucide-react";
+import type { TranslationKey } from "@/lib/i18n";
+import { loginAction } from "./actions";
+
+function getErrorKey(error: string): TranslationKey | null {
+  if (error === "invalid_credentials") return "auth.invalidCredentials";
+  if (error === "email_not_confirmed") return "auth.emailNotConfirmed";
+  return null;
+}
 
 export default function LoginPage() {
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
   const [confirmedEmail, setConfirmedEmail] = useState("");
@@ -21,36 +30,39 @@ export default function LoginPage() {
     startTransition(async () => {
       const result = await loginAction(formData);
       if (result?.error === "email_not_confirmed") {
-        setConfirmedEmail(result.email as string);
+        setConfirmedEmail(typeof result.email === "string" ? result.email : "");
         setEmailNotConfirmed(true);
       } else if (result?.error) {
-        setError(result.error as string);
+        setError(result.error);
       }
     });
   }
 
+  const errorKey = error ? getErrorKey(error) : null;
+  const errorMessage = errorKey ? t(errorKey) : error;
+
   return (
     <div className="glass-card rounded-2xl p-7 shadow-2xl">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-foreground">Tekrar hoş geldin</h2>
-        <p className="text-muted-foreground text-sm mt-1">Seni bekliyorlar</p>
+        <h2 className="text-xl font-bold text-foreground">{t("auth.welcomeTitle")}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t("auth.welcomeSubtitle")}</p>
       </div>
 
-      {error && (
-        <div className="mb-5 p-3.5 rounded-xl bg-destructive/10 border border-destructive/25 flex gap-3 items-start">
-          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-          <p className="text-sm text-destructive">{error}</p>
+      {errorMessage && (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-destructive/25 bg-destructive/10 p-3.5">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <p className="text-sm text-destructive">{errorMessage}</p>
         </div>
       )}
 
       {emailNotConfirmed && (
-        <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex gap-3 items-start">
-          <Mail className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3.5">
+          <Mail className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           <div>
-            <p className="text-sm font-semibold text-amber-400">E-posta doğrulaması gerekiyor</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              <span className="text-foreground font-medium">{confirmedEmail}</span> adresine
-              {" "}bağlantı gönderdik. Tıkla, sonra giriş yap.
+            <p className="text-sm font-semibold text-amber-400">{t("auth.emailNotConfirmed")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{confirmedEmail}</span>{" "}
+              {t("auth.emailNotConfirmedBody")}
             </p>
           </div>
         </div>
@@ -58,7 +70,9 @@ export default function LoginPage() {
 
       <form action={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="email" className="text-sm font-medium text-foreground/80">E-posta</Label>
+          <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
+            {t("auth.email")}
+          </Label>
           <Input
             id="email"
             name="email"
@@ -67,12 +81,14 @@ export default function LoginPage() {
             required
             autoComplete="email"
             disabled={isPending}
-            className="bg-input/50 border-border/60 rounded-xl h-11 focus:border-primary/60 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
+            className="h-11 rounded-xl border-border/60 bg-input/50 transition-all placeholder:text-muted-foreground/50 focus:border-primary/60 focus:ring-primary/20"
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="password" className="text-sm font-medium text-foreground/80">Şifre</Label>
+          <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
+            {t("auth.password")}
+          </Label>
           <Input
             id="password"
             name="password"
@@ -81,35 +97,36 @@ export default function LoginPage() {
             required
             autoComplete="current-password"
             disabled={isPending}
-            className="bg-input/50 border-border/60 rounded-xl h-11 focus:border-primary/60 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
+            className="h-11 rounded-xl border-border/60 bg-input/50 transition-all placeholder:text-muted-foreground/50 focus:border-primary/60 focus:ring-primary/20"
           />
         </div>
 
         <Button
           type="submit"
-          className="w-full h-11 rounded-xl font-semibold text-sm mt-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-teal transition-all"
+          className="glow-teal mt-2 h-11 w-full rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90"
           disabled={isPending}
         >
           {isPending ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Giriş yapılıyor...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {t("auth.loggingIn")}
             </>
           ) : (
             <>
-              <LogIn className="h-4 w-4 mr-2" />
-              Giriş Yap
+              <LogIn className="mr-2 h-4 w-4" />
+              {t("auth.login")}
             </>
           )}
         </Button>
       </form>
 
-      <p className="text-center text-sm text-muted-foreground mt-6">
-        Hesabın yok mu?{" "}
-        <Link href="/register" className="text-primary font-semibold hover:text-primary/80 transition-colors">
-          Kayıt ol
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        {t("auth.noAccount")}{" "}
+        <Link href="/register" className="font-semibold text-primary transition-colors hover:text-primary/80">
+          {t("auth.registerLink")}
         </Link>
       </p>
     </div>
   );
 }
+

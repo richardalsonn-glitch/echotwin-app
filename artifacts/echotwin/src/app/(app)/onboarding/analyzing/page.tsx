@@ -1,27 +1,30 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { Brain, CheckCircle2, Loader2, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { useI18n } from "@/context/language-context";
+import type { TranslationKey } from "@/lib/i18n";
 
 type AnalysisState = "analyzing" | "success" | "error";
 
-const STEPS = [
-  "Mesajlar yükleniyor...",
-  "Konuşma kalıpları belirleniyor...",
-  "Emoji kullanımı analiz ediliyor...",
-  "Ton ve üslup çıkarılıyor...",
-  "Kişilik profili oluşturuluyor...",
-  "Son rötuşlar yapılıyor...",
+const STEP_KEYS: TranslationKey[] = [
+  "analyze.steps.0",
+  "analyze.steps.1",
+  "analyze.steps.2",
+  "analyze.steps.3",
+  "analyze.steps.4",
+  "analyze.steps.5",
 ];
 
 function AnalyzingPageContent() {
   const router = useRouter();
   const params = useSearchParams();
   const personaId = params?.get("persona_id") ?? "";
+  const { t } = useI18n();
 
   const [state, setState] = useState<AnalysisState>("analyzing");
   const [currentStep, setCurrentStep] = useState(0);
@@ -30,13 +33,14 @@ function AnalyzingPageContent() {
   useEffect(() => {
     if (!personaId) return;
 
-    const stepInterval = setInterval(() => {
-      setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
+    const stepInterval = window.setInterval(() => {
+      setCurrentStep((s) => Math.min(s + 1, STEP_KEYS.length - 1));
     }, 2500);
 
-    runAnalysis();
+    void runAnalysis();
 
-    return () => clearInterval(stepInterval);
+    return () => window.clearInterval(stepInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personaId]);
 
   async function runAnalysis() {
@@ -48,16 +52,16 @@ function AnalyzingPageContent() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Analiz başarısız");
+        const data: unknown = await res.json().catch(() => ({}));
+        throw new Error(getApiError(data) ?? t("analyze.errorTitle"));
       }
 
       setState("success");
-      setTimeout(() => {
+      window.setTimeout(() => {
         router.push(`/chat/${personaId}`);
       }, 1800);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+      const message = err instanceof Error ? err.message : t("analyze.errorTitle");
       setError(message);
       setState("error");
       toast.error(message);
@@ -65,7 +69,7 @@ function AnalyzingPageContent() {
   }
 
   return (
-    <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center px-6 ambient-bg">
+    <div className="ambient-bg mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6">
       <AnimatePresence mode="wait">
         {state === "analyzing" && (
           <motion.div
@@ -73,58 +77,58 @@ function AnalyzingPageContent() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -24 }}
-            className="w-full text-center space-y-10"
+            className="w-full space-y-10 text-center"
           >
             <div className="relative mx-auto h-28 w-28">
               <div
-                className="absolute inset-0 rounded-full bg-primary/15 animate-ping"
+                className="absolute inset-0 animate-ping rounded-full bg-primary/15"
                 style={{ animationDuration: "2s" }}
               />
               <div
-                className="absolute inset-2 rounded-full bg-primary/10 animate-ping"
+                className="absolute inset-2 animate-ping rounded-full bg-primary/10"
                 style={{ animationDuration: "2.5s", animationDelay: "0.5s" }}
               />
-              <div className="relative h-28 w-28 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center glow-teal">
-                <span className="text-4xl">🧠</span>
+              <div className="glow-teal relative flex h-28 w-28 items-center justify-center rounded-full border border-primary/25 bg-primary/10">
+                <Brain className="h-12 w-12 text-primary" />
               </div>
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold tracking-tight mb-2">
-                Onu tanımaya çalışıyorum...
+              <h2 className="mb-2 text-2xl font-bold tracking-tight">
+                {t("analyze.title")}
               </h2>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Mesajlarını okuyorum, nasıl konuştuğunu öğreniyorum
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {t("analyze.desc")}
               </p>
             </div>
 
-            <div className="space-y-3 w-full text-left">
-              {STEPS.map((step, i) => (
+            <div className="w-full space-y-3 text-left">
+              {STEP_KEYS.map((stepKey, index) => (
                 <motion.div
-                  key={step}
+                  key={stepKey}
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: i <= currentStep ? 1 : 0.25 }}
+                  animate={{ opacity: index <= currentStep ? 1 : 0.25 }}
                   className="flex items-center gap-3"
                 >
                   <div className="shrink-0">
-                    {i < currentStep ? (
+                    {index < currentStep ? (
                       <CheckCircle2 className="h-4 w-4 text-green-400" />
-                    ) : i === currentStep ? (
-                      <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                    ) : index === currentStep ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     ) : (
                       <div className="h-4 w-4 rounded-full border border-border/50" />
                     )}
                   </div>
                   <span
                     className={`text-sm transition-colors ${
-                      i === currentStep
-                        ? "text-foreground font-medium"
-                        : i < currentStep
+                      index === currentStep
+                        ? "font-medium text-foreground"
+                        : index < currentStep
                           ? "text-muted-foreground line-through"
                           : "text-muted-foreground/50"
                     }`}
                   >
-                    {step}
+                    {t(stepKey)}
                   </span>
                 </motion.div>
               ))}
@@ -138,20 +142,20 @@ function AnalyzingPageContent() {
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", bounce: 0.4 }}
-            className="text-center space-y-5"
+            className="space-y-5 text-center"
           >
             <div className="relative mx-auto h-24 w-24">
-              <div className="absolute inset-0 rounded-full bg-green-500/20 animate-pulse" />
-              <div className="relative h-24 w-24 rounded-full bg-green-500/10 border border-green-500/25 flex items-center justify-center">
+              <div className="absolute inset-0 animate-pulse rounded-full bg-green-500/20" />
+              <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-green-500/25 bg-green-500/10">
                 <CheckCircle2 className="h-12 w-12 text-green-400" />
               </div>
             </div>
             <div>
               <h2 className="text-2xl font-bold tracking-tight">
-                Hazır, özlüyor musun?
+                {t("analyze.successTitle")}
               </h2>
-              <p className="text-muted-foreground text-sm mt-1">
-                Seni bekliyordu...
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t("analyze.successDesc")}
               </p>
             </div>
           </motion.div>
@@ -162,36 +166,36 @@ function AnalyzingPageContent() {
             key="error"
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-center space-y-5 w-full"
+            className="w-full space-y-5 text-center"
           >
-            <div className="h-24 w-24 rounded-full bg-destructive/10 border border-destructive/25 flex items-center justify-center mx-auto">
+            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-destructive/25 bg-destructive/10">
               <XCircle className="h-12 w-12 text-destructive" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Analiz Başarısız</h2>
-              <p className="text-muted-foreground text-sm mt-1 max-w-xs mx-auto">
+              <h2 className="text-xl font-bold">{t("analyze.errorTitle")}</h2>
+              <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
                 {error}
               </p>
             </div>
-            <div className="flex flex-col gap-2 w-full max-w-xs mx-auto">
+            <div className="mx-auto flex w-full max-w-xs flex-col gap-2">
               <Button
-                className="rounded-xl h-11 bg-primary text-primary-foreground hover:bg-primary/90"
+                className="h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={() => {
                   setState("analyzing");
                   setCurrentStep(0);
                   setError(null);
-                  runAnalysis();
+                  void runAnalysis();
                 }}
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Tekrar Dene
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {t("common.retry")}
               </Button>
               <Button
                 variant="outline"
-                className="rounded-xl h-11 border-border/50 hover:bg-white/5"
+                className="h-11 rounded-xl border-border/50 hover:bg-white/5"
                 onClick={() => router.push("/home")}
               >
-                Ana Sayfa
+                {t("common.home")}
               </Button>
             </div>
           </motion.div>
@@ -205,7 +209,7 @@ export default function AnalyzingPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center ambient-bg">
+        <div className="ambient-bg flex min-h-screen items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       }
@@ -214,3 +218,10 @@ export default function AnalyzingPage() {
     </Suspense>
   );
 }
+
+function getApiError(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  const error = (value as Record<string, unknown>).error;
+  return typeof error === "string" && error.trim() ? error : null;
+}
+

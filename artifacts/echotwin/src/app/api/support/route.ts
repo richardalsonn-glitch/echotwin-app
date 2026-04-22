@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isLanguage, translate, type Language } from "@/lib/i18n";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,7 @@ type SupportAttachment = {
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
+  const language = getLanguage(formData.get("language"));
   const category = getStringValue(formData.get("category"));
   const subject = getStringValue(formData.get("subject"));
   const description = getStringValue(formData.get("description"));
@@ -26,21 +28,21 @@ export async function POST(request: NextRequest) {
 
   if (!SUPPORT_CATEGORIES.has(category)) {
     return NextResponse.json(
-      { error: "Lütfen destek konusunu seç." },
+      { error: translate(language, "support.needTopic") },
       { status: 400 }
     );
   }
 
   if (subject.length < 3) {
     return NextResponse.json(
-      { error: "Konu başlığını biraz daha net yaz." },
+      { error: translate(language, "support.needSubject") },
       { status: 400 }
     );
   }
 
   if (description.length < 10) {
     return NextResponse.json(
-      { error: "Açıklama kısmını biraz daha detaylandır." },
+      { error: translate(language, "support.needDescription") },
       { status: 400 }
     );
   }
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
   const attachmentInfo = getSupportAttachment(attachment);
   if (attachmentInfo && attachmentInfo.size > MAX_SUPPORT_ATTACHMENT_BYTES) {
     return NextResponse.json(
-      { error: "Ek dosya 20 MB'dan büyük olamaz." },
+      { error: translate(language, "support.fileTooLarge") },
       { status: 413 }
     );
   }
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
   console.info("[support] ticket created", {
     ticketId,
     category,
+    language,
     subject,
     descriptionLength: description.length,
     attachment: attachmentInfo,
@@ -73,14 +76,19 @@ function getStringValue(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getLanguage(value: FormDataEntryValue | null): Language {
+  return isLanguage(value) ? value : "tr";
+}
+
 function getSupportAttachment(
   value: FormDataEntryValue | null
 ): SupportAttachment | null {
   if (!value || typeof value === "string" || value.size < 1) return null;
 
   return {
-    name: value.name || "ek-dosya",
+    name: value.name || "attachment",
     type: value.type || "application/octet-stream",
     size: value.size,
   };
 }
+

@@ -1,44 +1,29 @@
-import { InfoCard, InfoPageShell } from "@/components/app/info-page-shell";
+"use client";
 
-const STEPS = [
-  {
-    label: "A",
-    title: "Sohbet yükle",
-    body:
-      "WhatsApp dışa aktarımlarını yükleyerek geçmiş konuşmaları sisteme verirsin. Uygulama mesaj dilini, hitap biçimini ve iletişim dinamiğini analiz eder.",
-  },
-  {
-    label: "B",
-    title: "Kişi seç",
-    body:
-      "Yüklenen konuşmalar içinden konuşmak istediğin kişiyi seçersin. Sistem o kişiye ait bir persona oluşturur.",
-  },
-  {
-    label: "C",
-    title: "Analiz et",
-    body:
-      "Konuşma tarzı, sık kullanılan kelimeler, mesaj yoğunluğu, ton ve genel iletişim alışkanlıkları analiz edilir.",
-  },
-  {
-    label: "D",
-    title: "Konuşmaya başla",
-    body:
-      "O kişiyle yeniden konuşuyormuş gibi sohbet edebilirsin. Yanıtlar yüklediğin geçmişe ve çıkarılan persona yapısına göre şekillenir.",
-  },
-  {
-    label: "E",
-    title: "Gelişmiş deneyim",
-    body:
-      "Premium / Full özelliklerde ses, gelişmiş hafıza, medya analizi ve daha zengin etkileşimler desteklenebilir.",
-  },
+import { InfoCard, InfoPageShell } from "@/components/app/info-page-shell";
+import { useI18n } from "@/context/language-context";
+import type { TranslationKey } from "@/lib/i18n";
+
+const STEPS: Array<{
+  label: string;
+  titleKey: TranslationKey;
+  bodyKey: TranslationKey;
+}> = [
+  { label: "A", titleKey: "info.how.step.0.title", bodyKey: "info.how.step.0.body" },
+  { label: "B", titleKey: "info.how.step.1.title", bodyKey: "info.how.step.1.body" },
+  { label: "C", titleKey: "info.how.step.2.title", bodyKey: "info.how.step.2.body" },
+  { label: "D", titleKey: "info.how.step.3.title", bodyKey: "info.how.step.3.body" },
+  { label: "E", titleKey: "info.how.step.4.title", bodyKey: "info.how.step.4.body" },
 ];
 
 export default function HowItWorksPage() {
+  const { t } = useI18n();
+
   return (
     <InfoPageShell
-      eyebrow="Çalışma Mantığı"
-      title="Bu uygulama ne işe yarıyor?"
-      subtitle="Sadece bir sohbet botu değil, bir iletişim izini yeniden kurma aracı."
+      eyebrow={t("info.howEyebrow")}
+      title={t("info.howTitle")}
+      subtitle={t("info.howSubtitle")}
     >
       <div className="space-y-3">
         {STEPS.map((step) => (
@@ -48,8 +33,10 @@ export default function HowItWorksPage() {
                 {step.label}
               </div>
               <div>
-                <h2 className="text-base font-bold text-white">{step.title}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-white/58">{step.body}</p>
+                <h2 className="text-base font-bold text-white">{t(step.titleKey)}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-white/58">
+                  {t(step.bodyKey)}
+                </p>
               </div>
             </div>
           </InfoCard>
@@ -57,9 +44,9 @@ export default function HowItWorksPage() {
       </div>
 
       <div className="rounded-3xl border border-amber-400/18 bg-amber-400/[0.07] p-5 text-sm leading-relaxed text-amber-100/78">
-        Bendeki Sen gerçek bir insanın birebir kopyası değildir; geçmiş iletişimi temel
-        alan bir yapay zeka simülasyonudur.
+        {t("info.note")}
       </div>
     </InfoPageShell>
   );
 }
+

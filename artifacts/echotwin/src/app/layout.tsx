@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { LanguageProvider } from "@/context/language-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -43,8 +44,10 @@ export default function RootLayout({
           forcedTheme="dark"
           disableTransitionOnChange
         >
-          {children}
-          <Toaster richColors position="top-center" />
+          <LanguageProvider>
+            {children}
+            <Toaster richColors position="top-center" />
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>
