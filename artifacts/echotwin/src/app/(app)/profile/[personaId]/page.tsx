@@ -350,14 +350,14 @@ export default function ProfilePage({
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-card border border-card-border rounded-xl p-3 text-center">
+          <div className="premium-panel premium-card-hover rounded-2xl p-3 text-center">
             <div className="flex items-center justify-center gap-1 mb-1">
               <MessageCircle className="h-4 w-4 text-primary" />
             </div>
             <p className="text-2xl font-bold">{persona.message_count_used}</p>
             <p className="text-xs text-muted-foreground">Toplam Mesaj</p>
           </div>
-          <div className="bg-card border border-card-border rounded-xl p-3 text-center">
+          <div className="premium-panel premium-card-hover rounded-2xl p-3 text-center">
             <div className="flex items-center justify-center gap-1 mb-1">
               <Brain className="h-4 w-4 text-primary" />
             </div>
@@ -403,11 +403,11 @@ export default function ProfilePage({
                 Kişilik Analizi
               </h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="bg-card border border-card-border rounded-lg p-3">
+                <div className="premium-panel rounded-2xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">Ton</p>
                   <p className="font-medium capitalize">{analysis.tone_style}</p>
                 </div>
-                <div className="bg-card border border-card-border rounded-lg p-3">
+                <div className="premium-panel rounded-2xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">Emoji</p>
                   <p className="font-medium capitalize">
                     {analysis.emoji_usage?.frequency === "never"
@@ -419,11 +419,11 @@ export default function ProfilePage({
                       : "Çok sık"}
                   </p>
                 </div>
-                <div className="bg-card border border-card-border rounded-lg p-3">
+                <div className="premium-panel rounded-2xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">Duygu Yoğunluğu</p>
                   <p className="font-medium">{analysis.affection_level}/10</p>
                 </div>
-                <div className="bg-card border border-card-border rounded-lg p-3">
+                <div className="premium-panel rounded-2xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">Ortalama Uzunluk</p>
                   <p className="font-medium">{analysis.avg_message_length} kr.</p>
                 </div>
@@ -441,6 +441,47 @@ export default function ProfilePage({
                   </div>
                 </div>
               )}
+
+              <div className="premium-panel rounded-3xl p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary/75">
+                  Konuşma izi
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-3">
+                    <p className="text-[11px] text-muted-foreground">Hitap tavrı</p>
+                    <p className="mt-1 text-sm font-semibold text-white/88">
+                      {analysis.response_patterns?.tends_to_ask_back
+                        ? "Soru ile döner"
+                        : "Direkt yanıtlar"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-3">
+                    <p className="text-[11px] text-muted-foreground">Mesaj ritmi</p>
+                    <p className="mt-1 text-sm font-semibold text-white/88">
+                      {analysis.response_patterns?.sends_multiple_messages
+                        ? "Parça parça yazar"
+                        : "Tek mesajda toparlar"}
+                    </p>
+                  </div>
+                </div>
+                {analysis.signature_openings?.length > 0 && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-[11px] text-muted-foreground">
+                      İmza başlangıçlar
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {analysis.signature_openings.slice(0, 4).map((opening) => (
+                        <span
+                          key={opening}
+                          className="rounded-full border border-primary/18 bg-primary/8 px-2.5 py-1 text-[11px] font-medium text-primary/85"
+                        >
+                          {opening}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

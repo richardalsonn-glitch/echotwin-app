@@ -241,7 +241,7 @@ export default function UpgradePage() {
                   aria-pressed={isSelected}
                   onClick={() => setSelectedTier(plan.tier)}
                   onKeyDown={(event) => handleCardKeyDown(event, plan.tier)}
-                  className={`relative flex h-[406px] w-[80vw] max-w-[292px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[412px] sm:w-auto sm:max-w-none ${
+                  className={`premium-card-hover relative flex h-[406px] w-[80vw] max-w-[292px] shrink-0 snap-center cursor-pointer flex-col overflow-hidden rounded-[24px] border p-3.5 outline-none transition-colors duration-300 sm:h-[412px] sm:w-auto sm:max-w-none ${
                     isSelected
                       ? "border-primary/70 bg-[#102735] shadow-[0_0_30px_rgba(20,184,166,0.22)]"
                       : "border-white/8 bg-[#0e1728] shadow-[0_12px_30px_rgba(0,0,0,0.22)] hover:border-primary/28"
@@ -274,6 +274,11 @@ export default function UpgradePage() {
                   {isSelected && (
                     <div className="pointer-events-none absolute inset-0 rounded-[24px] ring-1 ring-inset ring-primary/40" />
                   )}
+                  {isSelected && (
+                    <div className="absolute left-3 top-3 rounded-full border border-primary/30 bg-primary/16 px-2.5 py-1 text-[10px] font-bold text-primary">
+                      Seçili
+                    </div>
+                  )}
 
                   {plan.badge && (
                     <div className="absolute right-3 top-3 rounded-full border border-amber-300/25 bg-amber-300/12 px-2.5 py-1 text-[10px] font-bold text-amber-200 shadow-[0_0_16px_rgba(251,191,36,0.12)]">
@@ -281,7 +286,7 @@ export default function UpgradePage() {
                     </div>
                   )}
 
-                  <div className={`mb-3 flex items-start gap-2.5 ${plan.badge ? "pr-24" : ""}`}>
+                  <div className={`mb-3 flex items-start gap-2.5 ${plan.badge ? "pr-24" : ""} ${isSelected ? "pt-7" : ""}`}>
                     <div
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${plan.iconPanel}`}
                     >

@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CircleHelp,
   Crown,
+  LifeBuoy,
   LogIn,
   LogOut,
   Menu,
@@ -66,6 +67,12 @@ const MENU_ITEMS = [
     label: "Üyelik Paketleri",
     description: "Planları ve özellikleri gör",
     icon: Crown,
+  },
+  {
+    href: "/destek",
+    label: "Destek",
+    description: "Sorununu bize ilet",
+    icon: LifeBuoy,
   },
 ];
 

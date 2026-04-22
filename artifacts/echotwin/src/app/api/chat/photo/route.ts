@@ -153,6 +153,7 @@ export async function POST(request: NextRequest) {
       media_metadata: {
         caption,
         storage_path: storagePath,
+        image_analysis: imageAnalysis,
       },
       created_at: now,
     })

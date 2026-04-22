@@ -329,7 +329,7 @@ export default function HomePage() {
               {Array.from({ length: 3 }).map((_, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-4 p-4 rounded-2xl border border-white/5 bg-white/3"
+                  className="premium-panel flex items-center gap-4 rounded-3xl p-4"
                   style={{ opacity: 1 - i * 0.2 }}
                 >
                   <Skeleton className="h-14 w-14 rounded-full bg-white/5 shrink-0" />
@@ -352,7 +352,7 @@ export default function HomePage() {
               {/* Visual */}
               <div className="relative mb-8">
                 <div
-                  className="h-28 w-28 rounded-[2rem] flex items-center justify-center"
+                className="h-28 w-28 rounded-[2rem] flex items-center justify-center"
                   style={{
                     background: "linear-gradient(135deg, hsl(183,82%,12%) 0%, hsl(220,60%,12%) 100%)",
                     border: "1px solid hsl(183,82%,46%,0.25)",
@@ -376,7 +376,7 @@ export default function HomePage() {
               </p>
               <Link href="/onboarding/upload">
                 <button
-                  className="flex items-center gap-2.5 px-8 h-13 rounded-2xl font-semibold text-[14px] text-primary-foreground transition-all active:scale-[0.97]"
+                  className="premium-pressable flex items-center gap-2.5 px-8 h-13 rounded-2xl font-semibold text-[14px] text-primary-foreground"
                   style={{
                     background: "linear-gradient(135deg, hsl(183,82%,40%) 0%, hsl(183,82%,36%) 100%)",
                     boxShadow: "0 0 30px hsl(183,82%,46%,0.30)",
@@ -409,7 +409,7 @@ export default function HomePage() {
                         transition={{ delay: index * 0.06, duration: 0.3 }}
                       >
                         <div
-                          className={`group relative flex items-center gap-3.5 p-3.5 rounded-2xl cursor-pointer transition-all active:scale-[0.985] ${
+                          className={`premium-card-hover group relative flex items-center gap-3.5 p-3.5 rounded-2xl cursor-pointer transition-all active:scale-[0.985] ${
                             unread > 0
                               ? "border bg-card/70"
                               : "border bg-card/40 hover:bg-card/65"

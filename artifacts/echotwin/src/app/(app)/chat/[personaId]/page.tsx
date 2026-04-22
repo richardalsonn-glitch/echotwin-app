@@ -142,6 +142,10 @@ function getObjectValue(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
 
+function getOptionalObjectValue(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+}
+
 function getTranscribedText(value: unknown): string | null {
   const data = getObjectValue(value);
   return typeof data.text === "string" && data.text.trim() ? data.text.trim() : null;
@@ -152,6 +156,20 @@ function getTranscribeError(value: unknown): string {
   return typeof data.error === "string" && data.error.trim()
     ? data.error.trim()
     : "Ses mesajı okunamadı, tekrar dene";
+}
+
+function getImageMemoryNote(message: ChatMessage): string | null {
+  const metadata = getOptionalObjectValue(message.media_metadata);
+  const analysis = getOptionalObjectValue(metadata?.image_analysis);
+  const memoryNote = analysis?.memory_note;
+
+  return typeof memoryNote === "string" && memoryNote.trim()
+    ? memoryNote.trim()
+    : null;
+}
+
+function isDefaultPhotoCaption(content: string): boolean {
+  return content === "Fotograf gonderildi" || content === "FotoÄŸraf gÃ¶nderildi";
 }
 
 function formatVoiceDuration(durationMs: number): string {
@@ -214,7 +232,7 @@ function getDisplayMessageFromValue(value: unknown, personaId: string): DisplayM
     voice_provider: typeof data.voice_provider === "string" ? data.voice_provider : null,
     media_mime_type: typeof data.media_mime_type === "string" ? data.media_mime_type : null,
     media_size_bytes: typeof data.media_size_bytes === "number" ? data.media_size_bytes : null,
-    media_metadata: null,
+    media_metadata: getOptionalObjectValue(data.media_metadata),
     created_at: typeof data.created_at === "string" ? data.created_at : new Date().toISOString(),
     status: role === "user" ? "read" : undefined,
   };
@@ -1500,14 +1518,14 @@ export default function ChatPage({
               />
             </div>
             <p className="font-bold text-[17px] text-white/90 tracking-tight">{persona.display_name}</p>
-            <p className="text-white/40 text-[13.5px] mt-2 leading-relaxed max-w-[200px]">
+            <p className="text-white/42 text-[13.5px] mt-2 leading-relaxed max-w-[240px]">
               Sohbet henüz başlamadı
             </p>
 
             <div className="mt-7 flex flex-col gap-2.5 w-full max-w-[240px]">
               <button
                 type="button"
-                className="w-full py-3 px-4 rounded-2xl text-[13.5px] text-white/70 font-medium active:scale-[0.97] transition-all"
+                className="premium-pressable w-full py-3 px-4 rounded-2xl text-[13.5px] text-white/72 font-medium"
                 style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
                 onClick={() => inputRef.current?.focus()}
               >
@@ -1516,7 +1534,7 @@ export default function ChatPage({
               <button
                 type="button"
                 disabled={startingConvo}
-                className="w-full py-3 px-4 rounded-2xl text-[13.5px] text-primary font-semibold active:scale-[0.97] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="premium-pressable w-full py-3 px-4 rounded-2xl text-[13.5px] text-primary font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{
                   background: "rgba(20,184,166,0.10)",
                   border: "1px solid rgba(20,184,166,0.22)",
@@ -1545,16 +1563,17 @@ export default function ChatPage({
             const sameAsNext = index < messages.length - 1 && messages[index + 1].role === msg.role;
             const isVoiceMessage = !isUser && msg.message_type === "voice" && Boolean(msg.audio_url);
             const isImageMessage = msg.message_type === "image" && Boolean(msg.image_url);
+            const imageMemoryNote = isImageMessage ? getImageMemoryNote(msg) : null;
             const isPlayingVoice = playingVoiceMessageId === msg.id;
 
             return (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                initial={{ opacity: 0, y: 8, scale: 0.985 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.16, ease: [0.25, 0.46, 0.45, 0.94] }}
-                className={`flex ${isUser ? "justify-end" : "justify-start"} items-end gap-1.5 ${
-                  sameAsPrev ? "mt-0.5" : "mt-3"
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className={`message-pop flex ${isUser ? "justify-end" : "justify-start"} items-end gap-1.5 ${
+                  sameAsPrev ? "mt-1" : "mt-3.5"
                 }`}
               >
                 {/* Avatar placeholder on left */}
@@ -1576,10 +1595,10 @@ export default function ChatPage({
                 <div
                   className={`max-w-[76%] ${isUser ? "bubble-sent" : "bubble-received"} ${
                     isVoiceMessage
-                      ? "px-3 py-2.5 min-w-[210px]"
+                      ? "px-3.5 py-3 min-w-[218px]"
                       : isImageMessage
-                      ? "p-1.5 min-w-[190px]"
-                      : "px-3.5 py-2"
+                      ? "p-2 min-w-[202px]"
+                      : "px-3.5 py-2.5"
                   }`}
                   style={
                     isUser
@@ -1588,25 +1607,28 @@ export default function ChatPage({
                   }
                 >
                   {isImageMessage ? (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <img
                         src={msg.image_url ?? ""}
                         alt="Gönderilen fotoğraf"
-                        className="max-h-72 w-full rounded-[14px] object-cover"
+                        className="max-h-72 w-full rounded-[16px] border border-white/10 object-cover shadow-[0_12px_30px_rgba(0,0,0,0.20)]"
                         loading="lazy"
                       />
-                      {msg.content && msg.content !== "Fotograf gonderildi" && (
-                        <p className="px-1 text-[13px] leading-[1.4] whitespace-pre-wrap break-words">
+                      {msg.content && !isDefaultPhotoCaption(msg.content) && (
+                        <p className="px-1 text-[13.5px] leading-[1.45] whitespace-pre-wrap break-words">
                           {msg.content}
                         </p>
                       )}
+                      <div className="media-memory-note rounded-2xl px-3 py-2 text-[11.5px] leading-relaxed">
+                        {imageMemoryNote ?? "Fotoğraf analiz edildi ve sohbet bağlamına eklendi."}
+                      </div>
                     </div>
                   ) : isVoiceMessage ? (
                     <div className="flex items-center gap-2.5">
                       <button
                         type="button"
                         aria-label={isPlayingVoice ? "Sesli mesajı duraklat" : "Sesli mesajı oynat"}
-                        className="h-9 w-9 rounded-full bg-primary/18 border border-primary/25 flex items-center justify-center shrink-0 active:scale-95 transition-all"
+                        className="premium-pressable h-10 w-10 rounded-full bg-primary/18 border border-primary/28 flex items-center justify-center shrink-0 shadow-[0_0_18px_rgba(20,184,166,0.10)]"
                         onClick={() => void toggleVoicePlayback(msg)}
                       >
                         {isPlayingVoice ? (
@@ -1620,11 +1642,12 @@ export default function ChatPage({
                           <AudioLines className="h-3.5 w-3.5 text-primary/80 shrink-0" />
                           <span className="text-[13px] font-medium text-white/86">Sesli mesaj</span>
                         </div>
-                        <div className="mt-1.5 h-5 flex items-center gap-[3px]" aria-hidden="true">
+                        <div className="mt-1.5 h-6 flex items-center gap-[3px]" aria-hidden="true">
                           {[10, 16, 22, 13, 19, 25, 15, 21, 12, 18, 24, 14].map((height, waveIndex) => (
                             <span
                               key={waveIndex}
-                              className={`w-[3px] rounded-full ${
+                              data-playing={isPlayingVoice}
+                              className={`voice-wave-bar w-[3px] rounded-full ${
                                 isPlayingVoice ? "bg-primary/80" : "bg-white/28"
                               }`}
                               style={{
@@ -1785,7 +1808,7 @@ export default function ChatPage({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.16 }}
-                className="mb-3 rounded-[24px] border border-primary/18 bg-[#0f1a2e]/92 p-3 shadow-[0_16px_44px_rgba(0,0,0,0.28)]"
+                className="premium-panel mb-3 rounded-[24px] p-3"
               >
                 {(voiceStatus === "recording" || voiceStatus === "stopping") && (
                   <div className="flex items-center gap-3">
@@ -1806,7 +1829,8 @@ export default function ChatPage({
                         {voiceLevels.map((level, index) => (
                           <span
                             key={index}
-                            className="w-[3px] rounded-full bg-primary/80 shadow-[0_0_10px_rgba(20,184,166,0.28)]"
+                            data-playing="true"
+                            className="voice-wave-bar w-[3px] rounded-full bg-primary/80 shadow-[0_0_10px_rgba(20,184,166,0.28)]"
                             style={{ height: `${Math.round(7 + level * 25)}px` }}
                           />
                         ))}
@@ -1818,7 +1842,7 @@ export default function ChatPage({
                       title="Kaydı bitir"
                       disabled={voiceStatus === "stopping"}
                       onClick={() => void finishVoiceRecording()}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-400/30 bg-red-500/14 text-red-200 transition-all active:scale-95 disabled:opacity-50"
+                      className="premium-pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-400/30 bg-red-500/14 text-red-200 disabled:opacity-50"
                     >
                       {voiceStatus === "stopping" ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -1837,7 +1861,7 @@ export default function ChatPage({
                         aria-label={previewPlaying ? "Ön izlemeyi duraklat" : "Ön izlemeyi oynat"}
                         title={previewPlaying ? "Duraklat" : "Dinle"}
                         onClick={() => void toggleVoicePreviewPlayback()}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/30 bg-primary/14 text-primary transition-all active:scale-95"
+                        className="premium-pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/30 bg-primary/14 text-primary shadow-[0_0_18px_rgba(20,184,166,0.12)]"
                       >
                         {previewPlaying ? (
                           <Pause className="h-4 w-4 fill-primary" />
@@ -1858,7 +1882,8 @@ export default function ChatPage({
                           {activeVoiceLevels.map((level, index) => (
                             <span
                               key={index}
-                              className={`w-[3px] rounded-full ${
+                              data-playing={previewPlaying}
+                              className={`voice-wave-bar w-[3px] rounded-full ${
                                 previewPlaying ? "bg-primary/85" : "bg-white/30"
                               }`}
                               style={{ height: `${Math.round(7 + level * 21)}px` }}
@@ -1871,7 +1896,7 @@ export default function ChatPage({
                       <button
                         type="button"
                         onClick={clearVoicePreview}
-                        className="flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-white/8 bg-white/6 text-[12px] font-medium text-white/70 transition-all active:scale-[0.98]"
+                        className="premium-pressable flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-white/8 bg-white/6 text-[12px] font-medium text-white/70"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Sil
@@ -1879,7 +1904,7 @@ export default function ChatPage({
                       <button
                         type="button"
                         onClick={() => void restartVoiceRecording()}
-                        className="flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-white/8 bg-white/6 text-[12px] font-medium text-white/70 transition-all active:scale-[0.98]"
+                        className="premium-pressable flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-white/8 bg-white/6 text-[12px] font-medium text-white/70"
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
                         Yeniden
@@ -1887,7 +1912,7 @@ export default function ChatPage({
                       <button
                         type="button"
                         onClick={() => void sendVoicePreview()}
-                        className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary text-[12px] font-semibold text-primary-foreground shadow-[0_0_18px_rgba(20,184,166,0.22)] transition-all active:scale-[0.98]"
+                        className="premium-pressable flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary text-[12px] font-semibold text-primary-foreground shadow-[0_0_18px_rgba(20,184,166,0.22)]"
                       >
                         <Send className="h-3.5 w-3.5" />
                         Gönder
@@ -1909,6 +1934,28 @@ export default function ChatPage({
                     </div>
                   </div>
                 )}
+              </motion.div>
+            )}
+            {photoStatus === "uploading" && (
+              <motion.div
+                key="photo-upload-panel"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.18 }}
+                className="premium-panel mb-3 rounded-[24px] p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/24 bg-primary/12">
+                    <ImagePlus className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold text-white/90">
+                      Fotoğraf hazırlanıyor...
+                    </p>
+                    <div className="photo-loading-shimmer mt-2 h-1.5 overflow-hidden rounded-full" />
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1942,7 +1989,7 @@ export default function ChatPage({
               type="button"
               aria-label="Fotoğraf gönder"
               title="Fotoğraf gönder"
-              className="h-11 w-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 disabled:opacity-40"
+              className="premium-pressable h-11 w-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{
                 background:
                   photoStatus === "uploading"
@@ -1963,7 +2010,7 @@ export default function ChatPage({
               type="button"
               aria-label={voiceStatus === "recording" ? "Kaydı bitir" : "Sesli mesaj kaydet"}
               title={voiceStatus === "recording" ? "Kaydı bitir" : "Sesli mesaj kaydet"}
-              className="h-11 w-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 disabled:opacity-40"
+              className="premium-pressable h-11 w-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{
                 background:
                   voiceStatus === "recording"
@@ -1993,7 +2040,7 @@ export default function ChatPage({
             </button>
             <button
               type="button"
-              className="h-11 w-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-90 disabled:opacity-40"
+              className="premium-pressable h-11 w-11 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{
                 background:
                   !textSendDisabled
