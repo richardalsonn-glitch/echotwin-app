@@ -133,8 +133,11 @@ export default function UploadPage() {
   const showDropzone = uploadState === "idle" || uploadState === "error";
 
   return (
-    <div className="ambient-bg mx-auto flex min-h-screen max-w-md flex-col">
-      <div className="flex items-center gap-3 border-b border-white/5 bg-background/50 px-4 py-4 backdrop-blur-xl">
+    <div className="ambient-bg mx-auto flex min-h-[100dvh] max-w-md flex-col">
+      <div
+        className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/5 bg-background/80 px-4 pb-4 pt-4 backdrop-blur-xl"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
+      >
         <Link href="/home">
           <Button
             variant="ghost"
@@ -315,4 +318,3 @@ function getUploadError(value: unknown, fallback: string): string {
     ? data.error.trim()
     : fallback;
 }
-

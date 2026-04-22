@@ -69,7 +69,13 @@ function AnalyzingPageContent() {
   }
 
   return (
-    <div className="ambient-bg mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6">
+    <div
+      className="ambient-bg mx-auto flex min-h-[100dvh] max-w-md flex-col items-center justify-center px-6"
+      style={{
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 1.5rem)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
+      }}
+    >
       <AnimatePresence mode="wait">
         {state === "analyzing" && (
           <motion.div
@@ -209,7 +215,7 @@ export default function AnalyzingPage() {
   return (
     <Suspense
       fallback={
-        <div className="ambient-bg flex min-h-screen items-center justify-center">
+        <div className="ambient-bg flex min-h-[100dvh] items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       }
@@ -224,4 +230,3 @@ function getApiError(value: unknown): string | null {
   const error = (value as Record<string, unknown>).error;
   return typeof error === "string" && error.trim() ? error : null;
 }
-

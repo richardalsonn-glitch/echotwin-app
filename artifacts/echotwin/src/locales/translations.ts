@@ -1,6 +1,7 @@
 ﻿export const tr = {
   "common.appName": "BendekiSen",
   "common.back": "Geri",
+  "common.close": "Kapat",
   "common.cancel": "İptal",
   "common.continue": "Devam Et",
   "common.save": "Kaydet",
@@ -378,6 +379,7 @@
 export const en: Record<keyof typeof tr, string> = {
   ...tr,
   "common.back": "Back",
+  "common.close": "Close",
   "common.cancel": "Cancel",
   "common.continue": "Continue",
   "common.save": "Save",
@@ -731,6 +733,7 @@ export const en: Record<keyof typeof tr, string> = {
 export const ja: Record<keyof typeof tr, string> = {
   ...tr,
   "common.back": "戻る",
+  "common.close": "閉じる",
   "common.cancel": "キャンセル",
   "common.continue": "続ける",
   "common.save": "保存",

@@ -15,12 +15,14 @@ import {
   Menu,
   MessageCircle,
   Sparkles,
+  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { LanguageSwitcher } from "@/components/app/language-switcher";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -202,12 +204,25 @@ export function AppMenu({
 
       <SheetContent
         side="left"
-        className="w-[86vw] max-w-[360px] overflow-hidden border-r border-primary/15 bg-[#07101f]/95 p-0 text-white shadow-[24px_0_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl [&>button]:right-4 [&>button]:top-4 [&>button]:rounded-full [&>button]:border [&>button]:border-white/10 [&>button]:bg-white/[0.07] [&>button]:p-2 [&>button]:text-white/55 [&>button]:opacity-100 [&>button]:hover:text-primary"
+        className="w-[86vw] max-w-[360px] overflow-hidden border-r border-primary/15 bg-[#07101f]/95 p-0 text-white shadow-[24px_0_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl [&>button]:hidden"
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_22%_10%,rgba(20,184,166,0.22),transparent_58%)]" />
+        <SheetClose asChild>
+          <button
+            type="button"
+            aria-label={t("common.close")}
+            className="absolute right-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] text-white/65 shadow-[0_0_22px_rgba(20,184,166,0.10)] backdrop-blur-xl transition-all hover:border-primary/30 hover:text-primary active:scale-95"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.875rem)" }}
+          >
+            <X className="h-[18px] w-[18px]" />
+          </button>
+        </SheetClose>
 
         <div className="relative flex h-full flex-col">
-          <SheetHeader className="space-y-4 px-5 pb-5 pt-7 text-left">
+          <SheetHeader
+            className="space-y-4 px-5 pb-5 text-left"
+            style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 1.75rem)" }}
+          >
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/25 bg-primary/[0.12] shadow-[0_0_28px_rgba(20,184,166,0.18)]">
                 <MessageCircle className="h-5 w-5 text-primary" />

@@ -329,9 +329,12 @@ try {
       : t("select.voiceLocked");
 
   return (
-    <div className="max-w-md mx-auto min-h-screen flex flex-col ambient-bg">
+    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col ambient-bg">
       {/* Header */}
-      <div className="px-4 py-4 flex items-center gap-3 border-b border-white/5 bg-background/50 backdrop-blur-xl">
+      <div
+        className="sticky top-0 z-20 flex items-center gap-3 border-b border-white/5 bg-background/80 px-4 pb-4 pt-4 backdrop-blur-xl"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 1rem)" }}
+      >
         <Link href="/onboarding/upload">
           <Button
             variant="ghost"
@@ -671,7 +674,7 @@ export default function SelectPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center ambient-bg">
+        <div className="flex min-h-[100dvh] items-center justify-center ambient-bg">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       }
