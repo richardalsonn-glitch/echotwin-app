@@ -13,13 +13,12 @@ export type LanguageOption = {
   label: string;
   shortLabel: string;
   nativeLabel: string;
-  flag: string;
 };
 
 export const LANGUAGE_OPTIONS: LanguageOption[] = [
-  { code: "tr", label: "Turkish", shortLabel: "TR", nativeLabel: "Türkçe", flag: "🇹🇷" },
-  { code: "en", label: "English", shortLabel: "EN", nativeLabel: "English", flag: "🇺🇸" },
-  { code: "ja", label: "Japanese", shortLabel: "日本語", nativeLabel: "日本語", flag: "🇯🇵" },
+  { code: "tr", label: "Turkish", shortLabel: "TR", nativeLabel: "Türkçe" },
+  { code: "en", label: "English", shortLabel: "EN", nativeLabel: "English" },
+  { code: "ja", label: "Japanese", shortLabel: "日本語", nativeLabel: "日本語" },
 ];
 
 export function isLanguage(value: unknown): value is Language {

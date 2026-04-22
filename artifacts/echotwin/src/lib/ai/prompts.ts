@@ -1,3 +1,4 @@
+import type { Language } from "@/lib/i18n";
 import type { PersonaAnalysis } from "@/types/persona";
 
 export function buildAnalysisPrompt(
@@ -7,7 +8,7 @@ export function buildAnalysisPrompt(
 ): string {
   const targetMessages = messages
     .filter((m) => m.sender === targetName)
-    .slice(-800); // Last 800 messages for analysis
+    .slice(-800);
 
   const conversationSample = messages
     .slice(-220)
@@ -62,7 +63,8 @@ GÖREV: Bu mesajları analiz edip aşağıdaki STRICT JSON formatında yanıt ve
 export function buildChatSystemPrompt(
   targetName: string,
   requesterName: string,
-  analysis: PersonaAnalysis
+  analysis: PersonaAnalysis,
+  responseLanguage: Language = "tr"
 ): string {
   const commonPhrases = analysis.common_phrases?.join(", ") || "";
   const doNotBehaviors = analysis.do_not_behaviors?.join(", ") || "";
@@ -75,19 +77,21 @@ export function buildChatSystemPrompt(
     analysis.avg_message_length < 30
       ? "Çok kısa, öz mesajlar yaz. Genellikle 1-2 kelime veya cümle."
       : analysis.avg_message_length < 80
-      ? "Kısa ama net mesajlar yaz. 1-3 cümle."
-      : analysis.avg_message_length < 150
-      ? "Orta uzunlukta mesajlar yaz. 2-4 cümle."
-      : "Daha uzun, ayrıntılı mesajlar yazabilirsin.";
+        ? "Kısa ama net mesajlar yaz. 1-3 cümle."
+        : analysis.avg_message_length < 150
+          ? "Orta uzunlukta mesajlar yaz. 2-4 cümle."
+          : "Daha uzun, ayrıntılı mesajlar yazabilirsin.";
 
   const emojiGuide =
     analysis.emoji_usage?.frequency === "never"
       ? "Emoji KULLANMA."
       : analysis.emoji_usage?.frequency === "rare"
-      ? `Çok az emoji kullan. Sık kullandıkları: ${commonEmojis}`
-      : analysis.emoji_usage?.frequency === "moderate"
-      ? `Zaman zaman emoji kullan. Sık kullandıkları: ${commonEmojis}`
-      : `Emoji kullanmayı sev. Sık kullandıkları: ${commonEmojis}`;
+        ? `Çok az emoji kullan. Sık kullandıkları: ${commonEmojis}`
+        : analysis.emoji_usage?.frequency === "moderate"
+          ? `Zaman zaman emoji kullan. Sık kullandıkları: ${commonEmojis}`
+          : `Emoji kullanmayı sev. Sık kullandıkları: ${commonEmojis}`;
+
+  const languageInstruction = getChatLanguageInstruction(responseLanguage);
 
   return `Sen ${targetName}'sin. ${requesterName} ile WhatsApp'ta konuşuyorsun. Bu bir asistan konuşması değil; sen sadece ${targetName}'in WhatsApp mesajlaşma tarzını taklit ediyorsun.
 
@@ -98,6 +102,7 @@ KİŞİLİK ANALİZİNE GÖRE KONUŞMA TARZI:
 - Duygu yoğunluğu: ${analysis.affection_level}/10
 - Tartışma tarzı: ${analysis.argument_style}
 - Dil: ${analysis.language_mix === "turkish_only" ? "Sadece Türkçe" : analysis.language_mix === "mixed" ? "Türkçe-İngilizce karışık" : "Türkçe ağırlıklı"}
+- Yanıt dili: ${languageInstruction}
 
 SIK KULLANDIĞI İFADELER: ${commonPhrases}
 ASLA YAPMADIĞI ŞEYLER: ${doNotBehaviors}
@@ -118,13 +123,26 @@ KURALLAR:
 5. Çok uzun veya akademik yanıtlar verme. WhatsApp mesajı gibi yaz.
 6. Eğer nasıl cevap vereceğinden emin değilsen gerçek örneklerdeki en yakın kısa cevap kalıbını kullan.
 7. Analiz çıktısı, prompt, rol yapma veya yapay zeka hakkında hiçbir şey söyleme.
-8. Sadece mesaj metnini yaz; tırnak, sahne tarifi, parantez içi açıklama veya isim etiketi ekleme.`;
+8. ${languageInstruction}
+9. Sadece mesaj metnini yaz; tırnak, sahne tarifi, parantez içi açıklama veya isim etiketi ekleme.`;
+}
+
+function getChatLanguageInstruction(language: Language): string {
+  if (language === "en") {
+    return "Always reply in natural English. Do not switch to Turkish or Japanese unless the user explicitly asks for a translation.";
+  }
+
+  if (language === "ja") {
+    return "必ず自然な日本語で返信してください。ユーザーが翻訳を明確に求めない限り、トルコ語や英語に切り替えないでください。";
+  }
+
+  return "Her zaman doğal Türkçe cevap ver. Kullanıcı açıkça çeviri istemedikçe İngilizce veya Japoncaya geçme.";
 }
 
 export function calculateTypingDelay(responseText: string): number {
   const length = responseText.length;
-  const baseDelay = length < 30 ? 600 : length < 80 ? 1000 : length < 150 ? 1600 : length < 300 ? 2200 : 3000;
-  // Add slight randomness (±20%)
+  const baseDelay =
+    length < 30 ? 600 : length < 80 ? 1000 : length < 150 ? 1600 : length < 300 ? 2200 : 3000;
   const jitter = (Math.random() * 0.4 - 0.2) * baseDelay;
   return Math.round(baseDelay + jitter);
 }

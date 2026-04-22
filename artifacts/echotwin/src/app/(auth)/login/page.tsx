@@ -77,7 +77,7 @@ export default function LoginPage() {
             id="email"
             name="email"
             type="email"
-            placeholder="ornek@mail.com"
+            placeholder="@mail.com"
             required
             autoComplete="email"
             disabled={isPending}
@@ -129,4 +129,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

@@ -4,6 +4,7 @@ import { getAiErrorResponse } from "@/lib/ai/errors";
 import { runPersonaChat } from "@/lib/ai/agent";
 import { analyzeChatImage, createFallbackImageAnalysis, type ChatImageAnalysis } from "@/lib/ai/image";
 import { buildChatSystemPrompt } from "@/lib/ai/prompts";
+import { isLanguage, type Language } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
 import { shouldQueuePersonaVoiceMessage } from "@/lib/voice/message";
 import { getMediaMemoryItems } from "@/lib/media/memory";
@@ -28,6 +29,8 @@ export async function POST(request: NextRequest) {
   const personaId = formData.get("persona_id");
   const image = formData.get("image");
   const captionValue = formData.get("caption");
+  const languageValue = formData.get("language");
+  const language = isLanguage(languageValue) ? languageValue : "tr";
   const caption =
     typeof captionValue === "string" && captionValue.trim() ? captionValue.trim() : null;
 
@@ -171,7 +174,8 @@ export async function POST(request: NextRequest) {
   const systemPrompt = buildImageAwareSystemPrompt(
     typedPersona,
     typedPersona.analysis,
-    imageAnalysis
+    imageAnalysis,
+    language
   );
   const aiUserMessage = buildImageAwareUserMessage(caption, imageAnalysis);
   const assistantContent = await createAssistantPhotoReply({
@@ -259,9 +263,10 @@ async function getSafeImageAnalysis(params: Parameters<typeof analyzeChatImage>[
 function buildImageAwareSystemPrompt(
   persona: Persona,
   analysis: PersonaAnalysis,
-  imageAnalysis: ChatImageAnalysis
+  imageAnalysis: ChatImageAnalysis,
+  language: Language
 ): string {
-  return `${buildChatSystemPrompt(persona.target_name, persona.requester_name, analysis)}
+  return `${buildChatSystemPrompt(persona.target_name, persona.requester_name, analysis, language)}
 
 EK FOTOGRAF KURALLARI:
 - Kullanici fotograf gonderdi. Sen fotograf gonderme; sadece normal metin mesaji yaz.

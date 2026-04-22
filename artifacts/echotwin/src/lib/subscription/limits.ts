@@ -58,14 +58,14 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
 
 export const TIER_PRICES = {
   basic: {
-    monthly: 29.99,
-    yearly: 26.99,
+    monthly: 49.99,
+    yearly: 539.89,
     label: "Temel",
     currency: "TRY",
   },
   full: {
-    monthly: 49.99,
-    yearly: 44.99,
+    monthly: 89.99,
+    yearly: 971.89,
     label: "Full",
     currency: "TRY",
   },

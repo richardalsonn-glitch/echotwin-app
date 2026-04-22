@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
 import { runPersonaChat } from "@/lib/ai/agent";
 import { buildChatSystemPrompt } from "@/lib/ai/prompts";
+import { isLanguage } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
 import { createClient } from "@/lib/supabase/server";
 import type { PersonaAnalysis } from "@/types/persona";
@@ -43,9 +44,12 @@ export async function createPersonaMessage(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { persona_id } = await request.json();
+    const body: unknown = await request.json();
+    const payload = isRecord(body) ? body : {};
+    const persona_id = payload.persona_id;
+    const language = isLanguage(payload.language) ? payload.language : "tr";
 
-    if (!persona_id) {
+    if (typeof persona_id !== "string" || !persona_id) {
       return NextResponse.json({ error: "persona_id gerekli" }, { status: 400 });
     }
 
@@ -102,7 +106,8 @@ export async function createPersonaMessage(
     const systemPrompt = `${buildChatSystemPrompt(
       persona.target_name,
       persona.requester_name,
-      persona.analysis as PersonaAnalysis
+      persona.analysis as PersonaAnalysis,
+      language
     )}\n\n${config.systemInstruction}`;
 
     const aiResult = await runPersonaChat({
@@ -171,4 +176,8 @@ export async function createPersonaMessage(
       { status: aiError.status }
     );
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

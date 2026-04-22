@@ -511,7 +511,7 @@ export default function ChatPage({
         const res = await fetch("/api/chat/idle", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ persona_id: personaId }),
+          body: JSON.stringify({ persona_id: personaId, language }),
         });
         if (!res.ok) return;
         const data = await res.json();
@@ -593,7 +593,7 @@ export default function ChatPage({
       const res = await fetch("/api/chat/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ persona_id: personaId }),
+        body: JSON.stringify({ persona_id: personaId, language }),
       });
 
       if (!res.ok) {
@@ -1008,6 +1008,7 @@ export default function ChatPage({
       const formData = new FormData();
       formData.append("persona_id", personaId);
       formData.append("image", file);
+      formData.append("language", language);
       if (caption) formData.append("caption", caption);
 
       const res = await fetch("/api/chat/photo", {
@@ -1120,7 +1121,7 @@ export default function ChatPage({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ persona_id: personaId, message: content }),
+        body: JSON.stringify({ persona_id: personaId, message: content, language }),
       });
 
       if (!res.ok) {

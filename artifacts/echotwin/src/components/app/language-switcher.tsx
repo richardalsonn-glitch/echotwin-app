@@ -8,13 +8,48 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useI18n } from "@/context/language-context";
-import { LANGUAGE_OPTIONS } from "@/lib/i18n";
+import { LANGUAGE_OPTIONS, type Language } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type LanguageSwitcherProps = {
   className?: string;
   compact?: boolean;
 };
+
+function FlagIcon({ language }: { language: Language }) {
+  if (language === "en") {
+    return (
+      <span className="relative block h-4 w-6 overflow-hidden rounded-[5px] border border-white/20 bg-[repeating-linear-gradient(to_bottom,#b22234_0_2px,#ffffff_2px_4px)] shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+        <span className="absolute left-0 top-0 h-[9px] w-[11px] bg-[#3c3b6e]" />
+        <span className="absolute left-[2px] top-[2px] h-1 w-1 rounded-full bg-white/90" />
+        <span className="absolute left-[6px] top-[2px] h-1 w-1 rounded-full bg-white/75" />
+        <span className="absolute left-[4px] top-[5px] h-1 w-1 rounded-full bg-white/80" />
+      </span>
+    );
+  }
+
+  if (language === "ja") {
+    return (
+      <span className="relative block h-4 w-6 overflow-hidden rounded-[5px] border border-white/20 bg-white shadow-[0_0_10px_rgba(255,255,255,0.08)]">
+        <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#bc002d]" />
+      </span>
+    );
+  }
+
+  return (
+    <span className="relative block h-4 w-6 overflow-hidden rounded-[5px] border border-white/20 bg-[#e30a17] shadow-[0_0_10px_rgba(227,10,23,0.22)]">
+      <span className="absolute left-[6px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-white" />
+      <span className="absolute left-[8px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#e30a17]" />
+      <span
+        className="absolute left-[14px] top-[5px] h-[6px] w-[6px] bg-white"
+        style={{
+          clipPath:
+            "polygon(50% 0%, 61% 35%, 98% 35%, 68% 56%, 79% 91%, 50% 70%, 21% 91%, 32% 56%, 2% 35%, 39% 35%)",
+        }}
+      />
+    </span>
+  );
+}
 
 export function LanguageSwitcher({
   className,
@@ -39,7 +74,7 @@ export function LanguageSwitcher({
           >
             <span className="flex min-w-0 items-center gap-2.5">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-primary/18 bg-primary/10 text-[15px]">
-                {selected.flag}
+                <FlagIcon language={selected.code} />
               </span>
               <span className="min-w-0">
                 <span className="block text-[10.5px] font-semibold uppercase tracking-[0.16em] text-primary/75">
@@ -71,7 +106,7 @@ export function LanguageSwitcher({
                 )}
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04] text-[15px]">
-                  {option.flag}
+                  <FlagIcon language={option.code} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold">{option.shortLabel}</span>
@@ -87,4 +122,3 @@ export function LanguageSwitcher({
     </div>
   );
 }
-

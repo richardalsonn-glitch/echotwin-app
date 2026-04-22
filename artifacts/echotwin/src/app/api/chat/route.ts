@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
 import { runPersonaChat } from "@/lib/ai/agent";
 import { buildChatSystemPrompt, calculateTypingDelay } from "@/lib/ai/prompts";
+import { isLanguage } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
 import { shouldQueuePersonaVoiceMessage } from "@/lib/voice/message";
 import type { Persona, PersonaAnalysis } from "@/types/persona";
@@ -19,9 +20,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { persona_id, message } = await request.json();
+    const body: unknown = await request.json();
+    const payload = isRecord(body) ? body : {};
+    const persona_id = payload.persona_id;
+    const message = payload.message;
+    const language = isLanguage(payload.language) ? payload.language : "tr";
 
-    if (!persona_id || !message?.trim()) {
+    if (typeof persona_id !== "string" || typeof message !== "string" || !message.trim()) {
       return NextResponse.json({ error: "persona_id ve message gerekli" }, { status: 400 });
     }
 
@@ -78,7 +83,8 @@ export async function POST(request: NextRequest) {
     const systemPrompt = buildChatSystemPrompt(
       persona.target_name,
       persona.requester_name,
-      persona.analysis as PersonaAnalysis
+      persona.analysis as PersonaAnalysis,
+      language
     );
 
     // Calculate typing delay before streaming
@@ -187,4 +193,8 @@ export async function POST(request: NextRequest) {
 
 function toSubscriptionTier(value: unknown): SubscriptionTier {
   return value === "basic" || value === "full" ? value : "free";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
