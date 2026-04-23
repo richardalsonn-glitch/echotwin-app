@@ -60,6 +60,17 @@ export type AiStreamResult = {
   attempts: AiAttempt[];
 };
 
+export type PersonaChatGenerationResult = {
+  reply: string;
+  realismScore: number;
+  matchedStyleSignals: string[];
+  rejectedForAiTone: boolean;
+  fallbackUsed: boolean;
+  modelUsed: string;
+  provider: AiProviderName;
+  attempts: AiAttempt[];
+};
+
 export type AiProviderTextRequest = Omit<AiTextRequest, "task" | "parseResponse"> & {
   model: string;
   timeoutMs: number;

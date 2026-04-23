@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
-import { runPersonaChat } from "@/lib/ai/agent";
+import { runPersonaChatGeneration } from "@/lib/ai/agent";
 import { analyzeChatImage, createFallbackImageAnalysis, type ChatImageAnalysis } from "@/lib/ai/image";
+import type { PersonaChatGenerationResult } from "@/lib/ai/types";
 import { buildChatResponsePrompt } from "@/lib/ai/prompts";
 import { isLanguage, type Language } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
       persona_id: personaId,
       user_id: user.id,
       role: "assistant",
-      content: assistantContent,
+      content: assistantContent.reply,
       message_type: "text",
       created_at: new Date().toISOString(),
     })
@@ -226,6 +227,12 @@ export async function POST(request: NextRequest) {
       nextMessageCount
     ),
     image_analysis: imageAnalysis,
+    reply: assistantContent.reply,
+    realism_score: assistantContent.realismScore,
+    matched_style_signals: assistantContent.matchedStyleSignals,
+    rejected_for_ai_tone: assistantContent.rejectedForAiTone,
+    fallback_used: assistantContent.fallbackUsed,
+    model_used: assistantContent.modelUsed,
   });
 }
 
@@ -307,12 +314,13 @@ async function createAssistantPhotoReply(params: {
   systemPrompt: string;
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
   userMessage: string;
-}): Promise<string> {
+}): Promise<PersonaChatGenerationResult> {
   try {
-    const aiResult = await runPersonaChat(params);
-    let content = "";
-    for await (const chunk of aiResult.stream) content += chunk;
-    return content.trim() || "Fotografi gordum.";
+    const aiResult = await runPersonaChatGeneration(params);
+    return {
+      ...aiResult,
+      reply: aiResult.reply.trim() || "Fotografi gordum.",
+    };
   } catch (error) {
     const aiError = getAiErrorResponse(error);
     console.warn("[chat-photo] persona reply fallback", {
@@ -320,7 +328,16 @@ async function createAssistantPhotoReply(params: {
       upstreamStatusCode: aiError.upstreamStatusCode,
       message: error instanceof Error ? error.message : "Unknown error",
     });
-    return "Fotografi gordum, su an cok net yorumlayamadim.";
+    return {
+      reply: "Fotografi gordum, su an cok net yorumlayamadim.",
+      realismScore: 50,
+      matchedStyleSignals: ["fallback_photo_reply"],
+      rejectedForAiTone: false,
+      fallbackUsed: true,
+      modelUsed: "deterministic-photo-fallback",
+      provider: "gemini",
+      attempts: [],
+    };
   }
 }
 

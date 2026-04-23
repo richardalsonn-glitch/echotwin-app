@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
-import { runPersonaChat } from "@/lib/ai/agent";
+import { runPersonaChatGeneration } from "@/lib/ai/agent";
 import { buildChatResponsePrompt } from "@/lib/ai/prompts";
 import { isLanguage } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
@@ -112,18 +112,12 @@ export async function createPersonaMessage(
       analysisSummaryCache: persona.analysis_summary_cache ?? null,
     })}\n\n${config.systemInstruction}`;
 
-    const aiResult = await runPersonaChat({
+    const aiResult = await runPersonaChatGeneration({
       systemPrompt,
       conversationHistory,
       userMessage: config.userMessage,
     });
-
-    let content = "";
-    for await (const chunk of aiResult.stream) {
-      content += chunk;
-    }
-
-    const trimmedContent = content.trim();
+    const trimmedContent = aiResult.reply.trim();
     if (!trimmedContent) {
       return NextResponse.json(
         { error: "AI bos mesaj dondurdu" },
@@ -170,6 +164,12 @@ export async function createPersonaMessage(
       message,
       messages: [message],
       message_count_used: nextMessageCount,
+      reply: trimmedContent,
+      realism_score: aiResult.realismScore,
+      matched_style_signals: aiResult.matchedStyleSignals,
+      rejected_for_ai_tone: aiResult.rejectedForAiTone,
+      fallback_used: aiResult.fallbackUsed,
+      model_used: aiResult.modelUsed,
     });
   } catch (error) {
     const aiError = getAiErrorResponse(error);

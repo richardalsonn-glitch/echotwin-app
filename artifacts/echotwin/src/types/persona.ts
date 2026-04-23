@@ -1,4 +1,19 @@
 export interface PersonaAnalysis {
+  relationship_type?: string;
+  warmth_level?: number;
+  reply_length_preference?: "very_short" | "short" | "mixed" | "medium" | "long";
+  initiative_level?: "low" | "medium" | "high";
+  emoji_habit?: "never" | "rare" | "moderate" | "frequent";
+  typo_tolerance?: "low" | "medium" | "high";
+  lowercase_ratio?: number;
+  filler_words?: string[];
+  affection_style?: string;
+  conflict_style?: string;
+  question_frequency?: number;
+  delay_style?: string;
+  topic_preferences?: string[];
+  avoid_patterns?: string[];
+  speech_rhythm?: string;
   avg_message_length: number;
   short_reply_ratio: number;
   emoji_usage: {

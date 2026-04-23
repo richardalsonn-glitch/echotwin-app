@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
-import { runPersonaChat } from "@/lib/ai/agent";
+import { runPersonaChatGeneration } from "@/lib/ai/agent";
 import { buildChatResponsePrompt, calculateTypingDelay } from "@/lib/ai/prompts";
 import { isLanguage } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
@@ -114,16 +114,15 @@ export async function POST(request: NextRequest) {
           // Small artificial delay for natural feel
           await new Promise((resolve) => setTimeout(resolve, Math.min(typingDelay, 2000)));
 
-          const aiResult = await runPersonaChat({
+          const aiResult = await runPersonaChatGeneration({
             systemPrompt,
             conversationHistory,
             userMessage: message.trim(),
           });
+          const fullResponse = aiResult.reply;
+          const chunks = chunkReply(fullResponse);
 
-          let fullResponse = "";
-
-          for await (const content of aiResult.stream) {
-            fullResponse += content;
+          for (const content of chunks) {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ type: "chunk", content })}\n\n`)
             );
@@ -160,6 +159,12 @@ export async function POST(request: NextRequest) {
                 content: fullResponse,
                 message_count_used: nextMessageCount,
                 voice_message_pending: voiceMessagePending,
+                reply: fullResponse,
+                realism_score: aiResult.realismScore,
+                matched_style_signals: aiResult.matchedStyleSignals,
+                rejected_for_ai_tone: aiResult.rejectedForAiTone,
+                fallback_used: aiResult.fallbackUsed,
+                model_used: aiResult.modelUsed,
               })}\n\n`
             )
           );
@@ -205,4 +210,21 @@ function toSubscriptionTier(value: unknown): SubscriptionTier {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function chunkReply(reply: string): string[] {
+  if (reply.length <= 24) return [reply];
+  const parts = reply.split(/(\s+)/);
+  const chunks: string[] = [];
+  let current = "";
+  for (const part of parts) {
+    if ((current + part).length > 32 && current.trim()) {
+      chunks.push(current);
+      current = part;
+    } else {
+      current += part;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
 }
