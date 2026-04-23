@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { PersonaAnalysis } from "@/types/persona";
 import { runStreamWithFallback, runTextWithFallback } from "./provider";
 import type {
@@ -9,42 +10,57 @@ import type {
   AiStreamResult,
 } from "./types";
 import { AiServiceError } from "./types";
+import { getAiUserMessage } from "./errors";
 
-type JsonObject = Record<string, unknown>;
+const MAX_CHAT_HISTORY_MESSAGES = 40;
 
-const PERSONA_ANALYSIS_SCHEMA = `{
-  "avg_message_length": number,
-  "short_reply_ratio": number,
-  "emoji_usage": {
-    "frequency": "never" | "rare" | "moderate" | "frequent",
-    "common_emojis": string[]
-  },
-  "tone_style": string,
-  "affection_level": number,
-  "argument_style": string,
-  "common_phrases": string[],
-  "style_examples": string[],
-  "response_patterns": {
-    "tends_to_ask_back": boolean,
-    "uses_long_messages": boolean,
-    "uses_abbreviations": boolean,
-    "sends_multiple_messages": boolean
-  },
-  "do_not_behaviors": string[],
-  "mood_distribution": {
-    "casual": number,
-    "flirty": number,
-    "moody": number,
-    "argumentative": number,
-    "soft": number
-  },
-  "signature_openings": string[],
-  "language_mix": "turkish_only" | "mostly_turkish" | "mixed" | "mostly_english" | "english_only"
-}`;
+const PERSONA_ANALYSIS_SCHEMA = z
+  .object({
+    avg_message_length: z.coerce.number().finite().min(0),
+    short_reply_ratio: z.coerce.number().finite().min(0).max(1),
+    emoji_usage: z
+      .object({
+        frequency: z.enum(["never", "rare", "moderate", "frequent"]),
+        common_emojis: z.array(z.string().min(1)).max(5),
+      })
+      .strict(),
+    tone_style: z.string().min(1),
+    affection_level: z.coerce.number().finite().min(1).max(10),
+    argument_style: z.string().min(1),
+    common_phrases: z.array(z.string().min(1)).max(12),
+    style_examples: z.array(z.string().min(1)).max(12).optional().default([]),
+    response_patterns: z
+      .object({
+        tends_to_ask_back: z.coerce.boolean(),
+        uses_long_messages: z.coerce.boolean(),
+        uses_abbreviations: z.coerce.boolean(),
+        sends_multiple_messages: z.coerce.boolean(),
+      })
+      .strict(),
+    do_not_behaviors: z.array(z.string().min(1)).max(5),
+    mood_distribution: z
+      .object({
+        casual: z.coerce.number().finite().min(0).max(100),
+        flirty: z.coerce.number().finite().min(0).max(100),
+        moody: z.coerce.number().finite().min(0).max(100),
+        argumentative: z.coerce.number().finite().min(0).max(100),
+        soft: z.coerce.number().finite().min(0).max(100),
+      })
+      .strict(),
+    signature_openings: z.array(z.string().min(1)).max(3),
+    language_mix: z.enum([
+      "turkish_only",
+      "mostly_turkish",
+      "mixed",
+      "mostly_english",
+      "english_only",
+    ]),
+  })
+  .strict();
 
-function asObject(value: unknown): JsonObject {
+function asObject(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as JsonObject)
+    ? (value as Record<string, unknown>)
     : {};
 }
 
@@ -105,9 +121,9 @@ function normalizePersonaAnalysis(value: unknown): PersonaAnalysis {
       frequency: asEmojiFrequency(emojiUsage.frequency),
       common_emojis: asStringArray(emojiUsage.common_emojis, 5),
     },
-    tone_style: asString(root.tone_style, "kısa ve doğal"),
+    tone_style: asString(root.tone_style, "kisa ve dogal"),
     affection_level: Math.min(10, Math.max(1, asNumber(root.affection_level, 4))),
-    argument_style: asString(root.argument_style, "doğrudan"),
+    argument_style: asString(root.argument_style, "dogrudan"),
     common_phrases: asStringArray(root.common_phrases, 12),
     style_examples: asStringArray(root.style_examples, 12),
     response_patterns: {
@@ -141,89 +157,80 @@ function extractJsonObject(text: string): unknown {
     const firstBrace = withoutFences.indexOf("{");
     const lastBrace = withoutFences.lastIndexOf("}");
     if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-      throw new Error("No JSON object found");
+      throw new AiServiceError({
+        code: "ai_invalid_json",
+        message: "No JSON object found",
+        userMessage: getAiUserMessage("ai_invalid_json"),
+        status: 502,
+        retryable: false,
+        fallbackEligible: true,
+      });
     }
-    return JSON.parse(withoutFences.slice(firstBrace, lastBrace + 1));
+
+    try {
+      return JSON.parse(withoutFences.slice(firstBrace, lastBrace + 1));
+    } catch (error) {
+      throw new AiServiceError({
+        code: "ai_invalid_json",
+        message: error instanceof Error ? error.message : "JSON parse failed",
+        userMessage: getAiUserMessage("ai_invalid_json"),
+        status: 502,
+        retryable: false,
+        fallbackEligible: true,
+        cause: error,
+      });
+    }
   }
 }
 
-async function repairPersonaAnalysisJson(rawResponse: string): Promise<PersonaAnalysisResult> {
-  const repair = await runTextWithFallback({
-    task: "fast-reply",
-    maxTokens: 1800,
-    temperature: 0.1,
-    responseFormat: "json_object",
-    messages: [
-      {
-        role: "system",
-        content:
-          "Geçersiz ya da dağınık model çıktısını strict JSON objesine dönüştür. Sadece JSON döndür.",
-      },
-      {
-        role: "user",
-        content: `Beklenen şema:\n${PERSONA_ANALYSIS_SCHEMA}\n\nDüzeltilecek çıktı:\n${rawResponse}`,
-      },
-    ],
-  });
+function parsePersonaAnalysis(rawResponse: string): PersonaAnalysis {
+  const parsed = extractJsonObject(rawResponse);
+  const validation = PERSONA_ANALYSIS_SCHEMA.safeParse(parsed);
 
-  try {
-    return {
-      analysis: normalizePersonaAnalysis(extractJsonObject(repair.content)),
-      rawResponse: repair.content,
-      provider: repair.provider,
-      model: repair.model,
-      attempts: repair.attempts,
-    };
-  } catch (error) {
+  if (!validation.success) {
     throw new AiServiceError({
-      code: "ai_invalid_response",
-      message: "AI analysis JSON repair failed",
-      userMessage: "Analiz sonucu işlenemedi. Lütfen tekrar dene.",
-      status: 502,
-      retryable: true,
-      attempts: repair.attempts,
-      cause: error,
+      code: "ai_validation_error",
+      message: validation.error.message,
+      userMessage: getAiUserMessage("ai_validation_error"),
+      status: 422,
+      retryable: false,
+      fallbackEligible: true,
+      cause: validation.error,
     });
   }
+
+  return normalizePersonaAnalysis(validation.data);
 }
 
 export async function runPersonaAnalysis(
   input: PersonaAnalysisInput
 ): Promise<PersonaAnalysisResult> {
-  const result = await runTextWithFallback({
+  const result = await runTextWithFallback<PersonaAnalysis>({
     task: "persona-analysis",
     maxTokens: 2400,
     temperature: 0.2,
     responseFormat: "json_object",
+    parseResponse: parsePersonaAnalysis,
     messages: [
       {
         role: "system",
-        content:
-          "Sen bir WhatsApp konuşma tarzı analiz servisisin. Yalnızca geçerli JSON döndür.",
+        content: "Sen bir WhatsApp konusma tarzi analiz servisisin. Yalnizca gecerli JSON dondur.",
       },
       { role: "user", content: input.prompt },
     ],
   });
 
-  try {
-    return {
-      analysis: normalizePersonaAnalysis(extractJsonObject(result.content)),
-      rawResponse: result.content,
-      provider: result.provider,
-      model: result.model,
-      attempts: result.attempts,
-    };
-  } catch {
-    const repaired = await repairPersonaAnalysisJson(result.content);
-    return {
-      ...repaired,
-      attempts: [...result.attempts, ...repaired.attempts],
-    };
-  }
+  return {
+    analysis: result.content,
+    rawResponse: result.rawContent,
+    provider: result.provider,
+    model: result.model,
+    attempts: result.attempts,
+  };
 }
 
 export async function runPersonaChat(input: PersonaChatInput): Promise<AiStreamResult> {
-  const history: AiMessage[] = input.conversationHistory.map((message) => ({
+  const history: AiMessage[] = input.conversationHistory.slice(-MAX_CHAT_HISTORY_MESSAGES).map((message) => ({
     role: message.role,
     content: message.content,
   }));

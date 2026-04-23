@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
 import { runPersonaChat } from "@/lib/ai/agent";
 import { analyzeChatImage, createFallbackImageAnalysis, type ChatImageAnalysis } from "@/lib/ai/image";
-import { buildChatSystemPrompt } from "@/lib/ai/prompts";
+import { buildChatResponsePrompt } from "@/lib/ai/prompts";
 import { isLanguage, type Language } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
 import { shouldQueuePersonaVoiceMessage } from "@/lib/voice/message";
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     .eq("persona_id", personaId)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(50);
 
   const conversationHistory = (history ?? []).reverse().map((message) => ({
     role: message.role as "user" | "assistant",
@@ -175,7 +175,8 @@ export async function POST(request: NextRequest) {
     typedPersona,
     typedPersona.analysis,
     imageAnalysis,
-    language
+    language,
+    typedPersona.analysis_summary_cache ?? null
   );
   const aiUserMessage = buildImageAwareUserMessage(caption, imageAnalysis);
   const assistantContent = await createAssistantPhotoReply({
@@ -254,6 +255,7 @@ async function getSafeImageAnalysis(params: Parameters<typeof analyzeChatImage>[
     const aiError = getAiErrorResponse(error);
     console.warn("[chat-photo] image analysis fallback", {
       code: aiError.code,
+      upstreamStatusCode: aiError.upstreamStatusCode,
       message: error instanceof Error ? error.message : "Unknown error",
     });
     return createFallbackImageAnalysis(params.caption);
@@ -264,9 +266,17 @@ function buildImageAwareSystemPrompt(
   persona: Persona,
   analysis: PersonaAnalysis,
   imageAnalysis: ChatImageAnalysis,
-  language: Language
+  language: Language,
+  analysisSummaryCache: Record<string, unknown> | null
 ): string {
-  return `${buildChatSystemPrompt(persona.target_name, persona.requester_name, analysis, language)}
+  return `${buildChatResponsePrompt({
+    targetName: persona.target_name,
+    requesterName: persona.requester_name,
+    analysis,
+    responseLanguage: language,
+    conversationHistory: [],
+    analysisSummaryCache,
+  })}
 
 EK FOTOGRAF KURALLARI:
 - Kullanici fotograf gonderdi. Sen fotograf gonderme; sadece normal metin mesaji yaz.
@@ -307,6 +317,7 @@ async function createAssistantPhotoReply(params: {
     const aiError = getAiErrorResponse(error);
     console.warn("[chat-photo] persona reply fallback", {
       code: aiError.code,
+      upstreamStatusCode: aiError.upstreamStatusCode,
       message: error instanceof Error ? error.message : "Unknown error",
     });
     return "Fotografi gordum, su an cok net yorumlayamadim.";

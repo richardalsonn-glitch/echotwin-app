@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
     console.error("[transcribe] failed", {
       code: aiError.code,
       status: aiError.status,
+      upstreamStatusCode: aiError.upstreamStatusCode,
       message: error instanceof Error ? error.message : "Unknown error",
     });
     return NextResponse.json(

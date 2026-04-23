@@ -27,17 +27,22 @@ export function createGeminiProvider(): AiProvider {
       const prompt = toPrompt(request.messages);
       return generateGeminiText({
         ...prompt,
+        model: request.model,
         temperature: request.temperature,
         maxOutputTokens: request.maxTokens,
         json: request.responseFormat === "json_object",
+        responseSchema: request.responseSchema,
+        timeoutMs: request.timeoutMs,
       });
     },
     async createStream(request: AiProviderStreamRequest) {
       const prompt = toPrompt(request.messages);
       const content = await generateGeminiText({
         ...prompt,
+        model: request.model,
         temperature: request.temperature,
         maxOutputTokens: request.maxTokens,
+        timeoutMs: request.timeoutMs,
       });
 
       return (async function* streamOnce() {

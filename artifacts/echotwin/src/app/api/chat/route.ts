@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
 import { runPersonaChat } from "@/lib/ai/agent";
-import { buildChatSystemPrompt, calculateTypingDelay } from "@/lib/ai/prompts";
+import { buildChatResponsePrompt, calculateTypingDelay } from "@/lib/ai/prompts";
 import { isLanguage } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
 import { shouldQueuePersonaVoiceMessage } from "@/lib/voice/message";
@@ -39,12 +39,12 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (personaError || !persona) {
-      return NextResponse.json({ error: "Persona bulunamadı" }, { status: 404 });
+      return NextResponse.json({ error: "Persona bulunamadi" }, { status: 404 });
     }
 
     if (!persona.analysis) {
       return NextResponse.json(
-        { error: "Bu profil henüz analiz edilmemiş" },
+        { error: "Bu profil henuz analiz edilmemis" },
         { status: 400 }
       );
     }
@@ -66,26 +66,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get conversation history (last 20 messages)
+    // Get conversation history (last 50 messages)
     const { data: history } = await supabase
       .from("messages")
       .select("role, content")
       .eq("persona_id", persona_id)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(50);
 
     const conversationHistory = (history ?? []).reverse().map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
 
-    const systemPrompt = buildChatSystemPrompt(
-      persona.target_name,
-      persona.requester_name,
-      persona.analysis as PersonaAnalysis,
-      language
-    );
+    const systemPrompt = buildChatResponsePrompt({
+      targetName: persona.target_name,
+      requesterName: persona.requester_name,
+      analysis: persona.analysis as PersonaAnalysis,
+      responseLanguage: language,
+      conversationHistory,
+      analysisSummaryCache: persona.analysis_summary_cache ?? null,
+    });
 
     // Calculate typing delay before streaming
     const typingDelay = calculateTypingDelay(message);
@@ -161,14 +163,20 @@ export async function POST(request: NextRequest) {
               })}\n\n`
             )
           );
-        } catch (error) {
-          const aiError = getAiErrorResponse(error);
-          const msg = aiError.message;
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: "error", message: msg, code: aiError.code })}\n\n`
-            )
-          );
+    } catch (error) {
+      const aiError = getAiErrorResponse(error);
+      console.error("[chat] failed", {
+        code: aiError.code,
+        status: aiError.status,
+        upstreamStatusCode: aiError.upstreamStatusCode,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+      const msg = aiError.message;
+      controller.enqueue(
+        encoder.encode(
+          `data: ${JSON.stringify({ type: "error", message: msg, code: aiError.code })}\n\n`
+        )
+      );
         } finally {
           controller.close();
         }

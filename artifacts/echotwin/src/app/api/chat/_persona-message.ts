@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
 import { runPersonaChat } from "@/lib/ai/agent";
-import { buildChatSystemPrompt } from "@/lib/ai/prompts";
+import { buildChatResponsePrompt } from "@/lib/ai/prompts";
 import { isLanguage } from "@/lib/i18n";
 import { canSendMessage } from "@/lib/subscription/limits";
 import { createClient } from "@/lib/supabase/server";
@@ -93,7 +93,7 @@ export async function createPersonaMessage(
       .eq("persona_id", persona_id)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(50);
 
     const conversationHistory: ChatHistoryMessage[] = (history ?? [])
       .reverse()
@@ -103,12 +103,14 @@ export async function createPersonaMessage(
       }));
 
     const config = MODE_CONFIG[mode];
-    const systemPrompt = `${buildChatSystemPrompt(
-      persona.target_name,
-      persona.requester_name,
-      persona.analysis as PersonaAnalysis,
-      language
-    )}\n\n${config.systemInstruction}`;
+    const systemPrompt = `${buildChatResponsePrompt({
+      targetName: persona.target_name,
+      requesterName: persona.requester_name,
+      analysis: persona.analysis as PersonaAnalysis,
+      responseLanguage: language,
+      conversationHistory,
+      analysisSummaryCache: persona.analysis_summary_cache ?? null,
+    })}\n\n${config.systemInstruction}`;
 
     const aiResult = await runPersonaChat({
       systemPrompt,
@@ -171,6 +173,13 @@ export async function createPersonaMessage(
     });
   } catch (error) {
     const aiError = getAiErrorResponse(error);
+    console.error("[chat-persona] failed", {
+      code: aiError.code,
+      status: aiError.status,
+      upstreamStatusCode: aiError.upstreamStatusCode,
+      message: error instanceof Error ? error.message : "Unknown error",
+      mode,
+    });
     return NextResponse.json(
       { error: aiError.message, code: aiError.code },
       { status: aiError.status }

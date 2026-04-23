@@ -3,21 +3,21 @@ import type { AiModelRoute, AiTask } from "./types";
 export const AI_MODEL_ROUTES: Record<AiTask, AiModelRoute> = {
   "persona-analysis": {
     task: "persona-analysis",
-    models: ["gemini-2.5-flash"],
-    timeoutMs: 60_000,
-    maxAttemptsPerModel: 2,
+    models: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+    timeoutMs: 28_000,
+    maxAttemptsPerModel: 1,
   },
   "persona-chat": {
     task: "persona-chat",
-    models: ["gemini-2.5-flash"],
-    timeoutMs: 45_000,
-    maxAttemptsPerModel: 2,
+    models: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+    timeoutMs: 18_000,
+    maxAttemptsPerModel: 1,
   },
   "fast-reply": {
     task: "fast-reply",
-    models: ["gemini-2.5-flash"],
-    timeoutMs: 25_000,
-    maxAttemptsPerModel: 2,
+    models: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+    timeoutMs: 12_000,
+    maxAttemptsPerModel: 1,
   },
 };
 

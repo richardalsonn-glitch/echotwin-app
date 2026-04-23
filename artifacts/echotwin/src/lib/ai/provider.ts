@@ -8,6 +8,7 @@ import type {
   AiTextResult,
 } from "./types";
 import { AiServiceError, isAiServiceError } from "./types";
+import { getAiUserMessage } from "./errors";
 
 function logAttempt(attempt: AiAttempt): void {
   if (attempt.status === "success") {
@@ -18,12 +19,12 @@ function logAttempt(attempt: AiAttempt): void {
   }
 
   console.warn(
-    `[ai] provider=${attempt.provider} task=${attempt.task} model=${attempt.model} status=failed code=${attempt.code ?? "unknown"} statusCode=${attempt.statusCode ?? "unknown"}`
+    `[ai] provider=${attempt.provider} task=${attempt.task} model=${attempt.model} status=failed code=${attempt.code ?? "unknown"} statusCode=${attempt.statusCode ?? "unknown"} upstreamStatus=${attempt.upstreamStatusCode ?? "unknown"}`
   );
 }
 
 function shouldTryNextModel(error: unknown): boolean {
-  return isAiServiceError(error) ? error.retryable : true;
+  return isAiServiceError(error) ? error.fallbackEligible : true;
 }
 
 function shouldRetrySameModel(
@@ -33,8 +34,7 @@ function shouldRetrySameModel(
 ): boolean {
   if (attemptIndex + 1 >= maxAttempts) return false;
   if (!isAiServiceError(error)) return true;
-  if (!error.retryable) return false;
-  return true;
+  return error.retryable;
 }
 
 function getRetryDelayMs(attemptIndex: number): number {
@@ -59,7 +59,7 @@ function buildFailedAttempt(
     : new AiServiceError({
         code: "ai_error",
         message: error instanceof Error ? error.message : "Unknown AI error",
-        userMessage: "AI servisi şu anda yanıt veremiyor. Lütfen biraz sonra tekrar dene.",
+        userMessage: "AI servisi su anda yanit veremiyor. Lutfen biraz sonra tekrar dene.",
       });
 
   return {
@@ -68,6 +68,7 @@ function buildFailedAttempt(
     model,
     status: "failed",
     statusCode: aiError.status,
+    upstreamStatusCode: aiError.upstreamStatusCode,
     code: aiError.code,
     message: aiError.message,
   };
@@ -95,17 +96,17 @@ function buildFinalError(attempts: AiAttempt[], cause: unknown): AiServiceError 
     code,
     status,
     message: sourceError?.message ?? lastFailed?.message ?? "All AI models failed",
-    userMessage:
-      code === "ai_rate_limited"
-        ? "Ücretsiz model limiti doldu, biraz sonra tekrar dene."
-        : "Şu an analiz servisi yoğun, lütfen tekrar dene.",
+    userMessage: getAiUserMessage(code, sourceError?.userMessage ?? lastFailed?.message),
     retryable: true,
+    fallbackEligible: false,
     attempts,
     cause,
   });
 }
 
-export async function runTextWithFallback(request: AiTextRequest): Promise<AiTextResult> {
+export async function runTextWithFallback<T = string>(
+  request: AiTextRequest<T>
+): Promise<AiTextResult<T>> {
   const route = getModelRoute(request.task);
   const provider = createGeminiProvider();
   const attempts: AiAttempt[] = [];
@@ -116,18 +117,24 @@ export async function runTextWithFallback(request: AiTextRequest): Promise<AiTex
 
     for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
       try {
-        const content = await provider.createText({
+        const rawContent = await provider.createText({
           messages: request.messages,
           maxTokens: request.maxTokens,
           temperature: request.temperature,
           responseFormat: request.responseFormat,
+          responseSchema: request.responseSchema,
           model,
           timeoutMs: route.timeoutMs,
         });
+
+        const content = request.parseResponse
+          ? request.parseResponse(rawContent)
+          : (rawContent as T);
+
         const success = buildSuccessAttempt(request, model);
         attempts.push(success);
         logAttempt(success);
-        return { content, provider: provider.name, model, attempts };
+        return { content, rawContent, provider: provider.name, model, attempts };
       } catch (error) {
         lastError = error;
         const failed = buildFailedAttempt(request, model, error);

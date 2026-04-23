@@ -35,6 +35,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ analysis, provider: "gemini" });
   } catch (error) {
     const aiError = getAiErrorResponse(error);
+    console.error("[analysis-chat] failed", {
+      code: aiError.code,
+      status: aiError.status,
+      upstreamStatusCode: aiError.upstreamStatusCode,
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
     return NextResponse.json(
       { error: aiError.message, code: aiError.code },
       { status: aiError.status }

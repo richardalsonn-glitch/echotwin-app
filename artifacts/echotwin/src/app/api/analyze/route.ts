@@ -30,6 +30,8 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   const supabase = await createClient();
+  let currentPersonaId = "";
+  let currentUserId = "";
 
   try {
     const {
@@ -39,9 +41,11 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    currentUserId = user.id;
 
     const body = (await request.json().catch(() => ({}))) as AnalyzeRequestBody;
     const personaId = typeof body.persona_id === "string" ? body.persona_id : "";
+    currentPersonaId = personaId;
 
     if (!personaId) {
       return NextResponse.json({ error: "persona_id gerekli" }, { status: 400 });
@@ -149,13 +153,24 @@ export async function POST(request: NextRequest) {
       provider: result.provider,
       model: result.model,
       used_basic_fallback: result.usedBasicFallback,
+      notice: result.fallbackNotice ?? null,
     });
   } catch (error) {
     const aiError = getAiErrorResponse(error);
-    console.error("[analysis] failed", error);
+    console.error("[analysis] failed", {
+      code: aiError.code,
+      status: aiError.status,
+      upstreamStatusCode: aiError.upstreamStatusCode,
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    if (currentPersonaId && currentUserId) {
+      await updateAnalysisStatus(supabase, currentPersonaId, currentUserId, "failed", aiError.code);
+    }
+
     return NextResponse.json(
       {
-        error: toUserAnalysisError(aiError.code),
+        error: aiError.message,
         code: aiError.code,
         status: "failed",
       },
@@ -239,17 +254,4 @@ async function updateAnalysisStatus(
 function isMissingAnalysisStatusColumn(message: string): boolean {
   const lower = message.toLowerCase();
   return lower.includes("analysis_status") || lower.includes("analysis_error_code");
-}
-
-function toUserAnalysisError(code: string): string {
-  if (code === "ai_rate_limited") {
-    return "Analiz su anda yogunluk nedeniyle gecikti. Lutfen biraz sonra tekrar dene.";
-  }
-  if (code === "ai_timeout" || code === "ai_provider_unavailable") {
-    return "Gecici bir baglanti sorunu olustu. Analiz tamamlanamadi, yeniden deneyebilirsin.";
-  }
-  if (code === "ai_auth_failed" || code === "ai_config_missing") {
-    return "Analiz servisi su anda hazir degil. Uygulama yoneticisinin AI ayarlarini kontrol etmesi gerekiyor.";
-  }
-  return "Analiz tamamlanamadi. Lutfen yeniden dene.";
 }

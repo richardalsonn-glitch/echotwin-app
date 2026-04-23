@@ -34,12 +34,14 @@ type GeminiGenerateResponse = {
 };
 
 export type GeminiTextRequest = {
+  model?: string;
   systemInstruction?: string;
   prompt: string;
   temperature?: number;
   maxOutputTokens?: number;
   json?: boolean;
   responseSchema?: Record<string, unknown>;
+  timeoutMs?: number;
 };
 
 export type GeminiImageRequest = Omit<GeminiTextRequest, "prompt"> & {
@@ -113,7 +115,7 @@ async function generateGeminiContent(params: {
   request: GeminiTextRequest;
 }): Promise<string> {
   const apiKey = getGeminiApiKey();
-  const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+  const model = params.request.model?.trim() || process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
   const url = `${GEMINI_API_BASE_URL}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const body: GeminiGenerateRequest = {
     contents: params.contents,
@@ -129,7 +131,7 @@ async function generateGeminiContent(params: {
   };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), params.request.timeoutMs ?? 25_000);
 
   try {
     const response = await fetch(url, {
@@ -138,10 +140,15 @@ async function generateGeminiContent(params: {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    const payload = (await response.json().catch(() => ({}))) as GeminiGenerateResponse;
+    const rawBody = await response.text();
+    const payload = parseJsonObject(rawBody) as GeminiGenerateResponse;
 
     if (!response.ok) {
-      throw normalizeGeminiError(response.status, payload.error?.message ?? response.statusText);
+      const message = payload.error?.message ?? (rawBody.trim() || response.statusText);
+      throw normalizeGeminiError(
+        response.status,
+        message
+      );
     }
 
     const text =
@@ -152,11 +159,12 @@ async function generateGeminiContent(params: {
 
     if (!text) {
       throw new AiServiceError({
-        code: "ai_invalid_response",
+        code: "ai_empty_result",
         message: "Gemini returned empty content",
-        userMessage: "AI yaniti islenemedi",
+        userMessage: "AI bos bir yanit dondurdu. Lutfen tekrar dene.",
         status: 502,
-        retryable: true,
+        retryable: false,
+        fallbackEligible: true,
       });
     }
 
@@ -167,18 +175,20 @@ async function generateGeminiContent(params: {
       throw new AiServiceError({
         code: "ai_timeout",
         message: "Gemini request timed out",
-        userMessage: "AI servisi zaman asimina ugradi",
+        userMessage: "AI istegi zaman asimina ugradi. Lutfen tekrar dene.",
         status: 504,
         retryable: true,
+        fallbackEligible: true,
         cause: error,
       });
     }
     throw new AiServiceError({
-      code: "ai_provider_unavailable",
+      code: "ai_service_unavailable",
       message: error instanceof Error ? error.message : "Gemini request failed",
-      userMessage: "AI servisi su anda yanit veremiyor",
+      userMessage: "AI servisi su anda yanit veremiyor. Lutfen tekrar dene.",
       status: 503,
       retryable: true,
+      fallbackEligible: true,
       cause: error,
     });
   } finally {
@@ -204,8 +214,10 @@ function normalizeGeminiError(status: number, message: string): AiServiceError {
     return new AiServiceError({
       code: "ai_auth_failed",
       message,
-      userMessage: "Gemini servisi yetkilendirilemedi",
+      userMessage: "Gemini yetkilendirilemedi. API anahtarini kontrol et.",
       status: 500,
+      fallbackEligible: false,
+      upstreamStatusCode: status,
     });
   }
 
@@ -213,17 +225,66 @@ function normalizeGeminiError(status: number, message: string): AiServiceError {
     return new AiServiceError({
       code: "ai_rate_limited",
       message,
-      userMessage: "Gemini su anda yogun, biraz sonra tekrar dene",
+      userMessage: "Gemini su anda cok yogun. Biraz sonra tekrar dene.",
       status,
       retryable: true,
+      fallbackEligible: true,
+      upstreamStatusCode: status,
+    });
+  }
+
+  if (status === 503) {
+    return new AiServiceError({
+      code: "ai_service_unavailable",
+      message,
+      userMessage: "Gemini gecici olarak ulasilamiyor. Biraz sonra tekrar dene.",
+      status,
+      retryable: true,
+      fallbackEligible: true,
+      upstreamStatusCode: status,
+    });
+  }
+
+  if (status === 504) {
+    return new AiServiceError({
+      code: "ai_timeout",
+      message,
+      userMessage: "Gemini yaniti zaman asimina ugradi. Lutfen tekrar dene.",
+      status,
+      retryable: true,
+      fallbackEligible: true,
+      upstreamStatusCode: status,
     });
   }
 
   return new AiServiceError({
     code: status >= 500 ? "ai_provider_unavailable" : "ai_error",
     message,
-    userMessage: "Gemini yaniti alinamadi",
+    userMessage: status >= 500 ? "Gemini yaniti alinamadi." : "Gemini istegi basarisiz oldu.",
     status,
     retryable: status >= 500,
+    fallbackEligible: status >= 500,
+    upstreamStatusCode: status,
   });
+}
+
+function parseJsonObject(rawBody: string): unknown {
+  const trimmed = rawBody.trim();
+  if (!trimmed) return {};
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const firstBrace = trimmed.indexOf("{");
+    const lastBrace = trimmed.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace <= firstBrace) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
+    } catch {
+      return {};
+    }
+  }
 }

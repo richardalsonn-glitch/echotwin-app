@@ -23,16 +23,19 @@ export type AiAttempt = {
   model: string;
   status: "success" | "failed";
   statusCode?: number;
+  upstreamStatusCode?: number;
   code?: string;
   message?: string;
 };
 
-export type AiTextRequest = {
+export type AiTextRequest<T = string> = {
   task: AiTask;
   messages: AiMessage[];
   maxTokens: number;
   temperature: number;
   responseFormat?: "json_object";
+  responseSchema?: Record<string, unknown>;
+  parseResponse?: (content: string) => T;
 };
 
 export type AiStreamRequest = {
@@ -42,8 +45,9 @@ export type AiStreamRequest = {
   temperature: number;
 };
 
-export type AiTextResult = {
-  content: string;
+export type AiTextResult<T = string> = {
+  content: T;
+  rawContent: string;
   provider: AiProviderName;
   model: string;
   attempts: AiAttempt[];
@@ -56,7 +60,7 @@ export type AiStreamResult = {
   attempts: AiAttempt[];
 };
 
-export type AiProviderTextRequest = Omit<AiTextRequest, "task"> & {
+export type AiProviderTextRequest = Omit<AiTextRequest, "task" | "parseResponse"> & {
   model: string;
   timeoutMs: number;
 };
@@ -99,9 +103,13 @@ export type FastReplyInput = {
 export type FriendlyAiErrorCode =
   | "ai_config_missing"
   | "ai_rate_limited"
+  | "ai_service_unavailable"
   | "ai_provider_unavailable"
   | "ai_timeout"
   | "ai_invalid_response"
+  | "ai_invalid_json"
+  | "ai_validation_error"
+  | "ai_empty_result"
   | "ai_auth_failed"
   | "ai_error";
 
@@ -110,6 +118,8 @@ export class AiServiceError extends Error {
   readonly status: number;
   readonly userMessage: string;
   readonly retryable: boolean;
+  readonly fallbackEligible: boolean;
+  readonly upstreamStatusCode?: number;
   readonly attempts: AiAttempt[];
 
   constructor(params: {
@@ -118,6 +128,8 @@ export class AiServiceError extends Error {
     userMessage: string;
     status?: number;
     retryable?: boolean;
+    fallbackEligible?: boolean;
+    upstreamStatusCode?: number;
     attempts?: AiAttempt[];
     cause?: unknown;
   }) {
@@ -127,6 +139,8 @@ export class AiServiceError extends Error {
     this.status = params.status ?? 500;
     this.userMessage = params.userMessage;
     this.retryable = params.retryable ?? false;
+    this.fallbackEligible = params.fallbackEligible ?? true;
+    this.upstreamStatusCode = params.upstreamStatusCode;
     this.attempts = params.attempts ?? [];
     this.cause = params.cause;
   }

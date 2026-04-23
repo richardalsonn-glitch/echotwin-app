@@ -2,6 +2,7 @@ import type { PersonaAnalysis } from "@/types/persona";
 import { runPersonaAnalysis } from "@/lib/ai/agent";
 import { buildAnalysisPrompt } from "@/lib/ai/prompts";
 import type { AiAttempt } from "@/lib/ai/types";
+import { isAiServiceError } from "@/lib/ai/types";
 
 export type CachedChatMessage = {
   sender: string;
@@ -26,6 +27,10 @@ export type AnalysisPipelineResult = {
   attempts: AiAttempt[];
   summaryCache: AnalysisSummaryCache;
   usedBasicFallback: boolean;
+  fallbackNotice?: {
+    code: string;
+    message: string;
+  };
 };
 
 export type AnalysisSummaryCache = {
@@ -50,6 +55,11 @@ type DeterministicSignals = {
   language_mix: PersonaAnalysis["language_mix"];
   sends_multiple_messages: boolean;
   uses_abbreviations: boolean;
+  relationship_context: string;
+  tone_profile: string;
+  reply_length_variability: "low" | "medium" | "high";
+  lowercase_tolerance: "low" | "medium" | "high";
+  typo_tolerance: "low" | "medium" | "high";
 };
 
 type PreparedAnalysisInput = {
@@ -57,8 +67,8 @@ type PreparedAnalysisInput = {
   summaryCache: AnalysisSummaryCache;
 };
 
-const MAX_ANALYSIS_MESSAGES = 1_100;
-const CHUNK_SIZE = 260;
+const MAX_ANALYSIS_MESSAGES = 320;
+const CHUNK_SIZE = 120;
 const MIN_TARGET_MESSAGES = 5;
 
 export function hasEnoughTargetMessages(
@@ -95,7 +105,20 @@ export async function runResilientPersonaAnalysis(params: {
       usedBasicFallback: false,
     };
   } catch (error) {
-    console.warn("[analysis] AI analysis failed, using basic fallback", error);
+    if (
+      isAiServiceError(error) &&
+      (error.code === "ai_auth_failed" || error.code === "ai_config_missing")
+    ) {
+      throw error;
+    }
+
+    const fallbackNotice = describeAnalysisFallback(error);
+    console.warn("[analysis] AI analysis failed, using basic fallback", {
+      code: fallbackNotice.code,
+      message: fallbackNotice.message,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+
     const fallback = buildBasicPersonaAnalysis(
       params.messages,
       params.targetName,
@@ -110,6 +133,7 @@ export async function runResilientPersonaAnalysis(params: {
       attempts: [],
       summaryCache: prepared.summaryCache,
       usedBasicFallback: true,
+      fallbackNotice,
     };
   }
 }
@@ -169,11 +193,12 @@ function sampleMessagesForAnalysis(
 ): CachedChatMessage[] {
   if (messages.length <= MAX_ANALYSIS_MESSAGES) return messages;
 
-  const firstContext = messages.slice(0, 80);
-  const lastContext = messages.slice(-360);
+  const firstContext = messages.slice(0, 20);
+  const lastContext = messages.slice(-80);
   const targetMessages = messages.filter((message) => message.sender === targetName);
-  const sampledTarget = takeEvenly(targetMessages, 560);
+  const sampledTarget = takeEvenly(targetMessages, 120);
   const seen = new Set<CachedChatMessage>();
+
   return [...firstContext, ...sampledTarget, ...lastContext].filter((message) => {
     if (seen.has(message)) return false;
     seen.add(message);
@@ -206,6 +231,9 @@ function extractDeterministicSignals(targetMessages: CachedChatMessage[]): Deter
   const commonEmojis = extractCommonEmojis(contents);
   const commonPhrases = extractCommonPhrases(contents);
   const signatureOpenings = extractSignatureOpenings(contents);
+  const usesAbbreviations = detectAbbreviations(contents);
+  const lowercaseTolerance = detectLowercaseTolerance(contents);
+  const typoTolerance = detectTypoTolerance(usesAbbreviations, lowercaseTolerance);
 
   return {
     avg_message_length: Math.round(avgLength),
@@ -217,7 +245,18 @@ function extractDeterministicSignals(targetMessages: CachedChatMessage[]): Deter
     signature_openings: signatureOpenings,
     language_mix: detectLanguageMix(contents),
     sends_multiple_messages: shortReplyRatio > 0.58 && avgLength < 75,
-    uses_abbreviations: detectAbbreviations(contents),
+    uses_abbreviations: usesAbbreviations,
+    relationship_context: inferRelationshipContext({
+      avgLength,
+      shortReplyRatio,
+      questionRatio,
+      emojiCount: commonEmojis.length,
+      usesAbbreviations,
+    }),
+    tone_profile: inferToneProfile(avgLength, shortReplyRatio, commonEmojis.length),
+    reply_length_variability: inferReplyLengthVariability(shortReplyRatio, avgLength),
+    lowercase_tolerance: lowercaseTolerance,
+    typo_tolerance: typoTolerance,
   };
 }
 
@@ -322,6 +361,57 @@ function extractSignatureOpenings(contents: string[]): string[] {
     .slice(0, 3);
 }
 
+function inferToneProfile(avgLength: number, shortReplyRatio: number, emojiCount: number): string {
+  if (avgLength < 45 && shortReplyRatio > 0.65) return "kisa ve hizli";
+  if (emojiCount > 2) return "samimi ve rahat";
+  if (avgLength > 120) return "uzun ve aciklayici";
+  if (shortReplyRatio > 0.45) return "gundelik ve akici";
+  return "notr ve dengeli";
+}
+
+function inferRelationshipContext(params: {
+  avgLength: number;
+  shortReplyRatio: number;
+  questionRatio: number;
+  emojiCount: number;
+  usesAbbreviations: boolean;
+}): string {
+  if (params.shortReplyRatio > 0.7 && params.avgLength < 55) return "hizli, kisa ve gundelik";
+  if (params.questionRatio > 0.28) return "merakli ve etkilesimli";
+  if (params.emojiCount > 2 || params.usesAbbreviations) return "samimi ve rahat";
+  if (params.avgLength > 120) return "daha detayli ve aciklayici";
+  return "notr ve dogal";
+}
+
+function inferReplyLengthVariability(
+  shortReplyRatio: number,
+  avgLength: number
+): "low" | "medium" | "high" {
+  if (avgLength < 35 || shortReplyRatio < 0.2 || shortReplyRatio > 0.8) return "low";
+  if (shortReplyRatio > 0.35 && shortReplyRatio < 0.65) return "high";
+  return "medium";
+}
+
+function detectLowercaseTolerance(contents: string[]): "low" | "medium" | "high" {
+  if (contents.length === 0) return "medium";
+  const lowercaseRatio =
+    contents.filter((content) => content === content.toLocaleLowerCase("tr-TR")).length /
+    contents.length;
+
+  if (lowercaseRatio > 0.75) return "high";
+  if (lowercaseRatio > 0.4) return "medium";
+  return "low";
+}
+
+function detectTypoTolerance(
+  usesAbbreviations: boolean,
+  lowercaseTolerance: "low" | "medium" | "high"
+): "low" | "medium" | "high" {
+  if (lowercaseTolerance === "high") return "high";
+  if (lowercaseTolerance === "medium" || usesAbbreviations) return "medium";
+  return "low";
+}
+
 function normalizeWords(content: string): string[] {
   return content
     .toLocaleLowerCase("tr-TR")
@@ -344,7 +434,7 @@ function getEmojiFrequency(
 
 function detectLanguageMix(contents: string[]): PersonaAnalysis["language_mix"] {
   const joined = contents.join(" ").toLocaleLowerCase("tr-TR");
-  const turkishHits = (joined.match(/[çğıöşü]/g) ?? []).length;
+  const turkishHits = (joined.match(/[\u00e7\u011f\u0131\u00f6\u015f\u00fc]/g) ?? []).length;
   const englishHits = (joined.match(/\b(the|and|you|are|what|why|love|ok|yes|no)\b/g) ?? [])
     .length;
   if (englishHits > turkishHits * 2 && turkishHits < 3) return "mostly_english";
@@ -359,7 +449,27 @@ function detectAbbreviations(contents: string[]): boolean {
 
 function inferAffectionLevel(contents: string[]): number {
   const joined = contents.join(" ").toLocaleLowerCase("tr-TR");
-  const hits = (joined.match(/\b(canım|askım|aşkım|seviyorum|özledim|kalbim|tatlım)\b/gu) ?? [])
-    .length;
+  const hits = (joined.match(/\b(canim|askim|seviyorum|ozledim|kalbim|tatlim)\b/gu) ?? []).length;
   return Math.min(10, Math.max(3, 3 + hits));
+}
+
+function describeAnalysisFallback(error: unknown): { code: string; message: string } {
+  if (isAiServiceError(error)) {
+    return {
+      code: error.code,
+      message: error.userMessage,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      code: "ai_error",
+      message: error.message,
+    };
+  }
+
+  return {
+    code: "ai_error",
+    message: "Unknown analysis failure",
+  };
 }
