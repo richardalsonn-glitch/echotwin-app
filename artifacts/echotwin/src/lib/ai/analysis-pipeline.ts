@@ -80,7 +80,7 @@ type PreparedAnalysisInput = {
   summaryCache: AnalysisSummaryCache;
 };
 
-const MAX_ANALYSIS_MESSAGES = 320;
+const MAX_ANALYSIS_MESSAGES = 12000;
 const CHUNK_SIZE = 120;
 const MIN_TARGET_MESSAGES = 5;
 
@@ -206,10 +206,10 @@ function sampleMessagesForAnalysis(
 ): CachedChatMessage[] {
   if (messages.length <= MAX_ANALYSIS_MESSAGES) return messages;
 
-  const firstContext = messages.slice(0, 20);
-  const lastContext = messages.slice(-80);
+  const firstContext = messages.slice(0, 120);
+  const lastContext = messages.slice(-600);
   const targetMessages = messages.filter((message) => message.sender === targetName);
-  const sampledTarget = takeEvenly(targetMessages, 120);
+  const sampledTarget = takeEvenly(targetMessages, MAX_ANALYSIS_MESSAGES - firstContext.length - lastContext.length);
   const seen = new Set<CachedChatMessage>();
 
   return [...firstContext, ...sampledTarget, ...lastContext].filter((message) => {

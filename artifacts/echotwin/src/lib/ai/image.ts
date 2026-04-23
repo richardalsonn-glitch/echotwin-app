@@ -77,6 +77,8 @@ Gorev:
 2. Fotograf son sohbet baglamiyla alakaliysa topic_relation "related" yap ve nasil baglanacagini conversation_bridge alanina yaz.
 3. Alakasizsa topic_relation "unrelated" yap; konuyu zorla baglama.
 4. Gecmis medya ile gercekten benziyorsa memory_match "strong" veya "weak" yap. Emin degilsen "none" yap. Asla uydurma hatira yazma.
+5. Cevap uretim katmani bu analize gore yazacak; bu yuzden description alaninda gorunen ana obje/kisi/ortam/duygu ve varsa yaziyi net belirt.
+6. Emin olmadigin detaylari kesinmis gibi yazma.
 
 JSON semasi:
 {

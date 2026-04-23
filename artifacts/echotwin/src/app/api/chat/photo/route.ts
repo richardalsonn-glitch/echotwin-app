@@ -177,7 +177,8 @@ export async function POST(request: NextRequest) {
     typedPersona.analysis,
     imageAnalysis,
     language,
-    typedPersona.analysis_summary_cache ?? null
+    typedPersona.analysis_summary_cache ?? null,
+    conversationHistory
   );
   const aiUserMessage = buildImageAwareUserMessage(caption, imageAnalysis);
   const assistantContent = await createAssistantPhotoReply({
@@ -274,14 +275,15 @@ function buildImageAwareSystemPrompt(
   analysis: PersonaAnalysis,
   imageAnalysis: ChatImageAnalysis,
   language: Language,
-  analysisSummaryCache: Record<string, unknown> | null
+  analysisSummaryCache: Record<string, unknown> | null,
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>
 ): string {
   return `${buildChatResponsePrompt({
     targetName: persona.target_name,
     requesterName: persona.requester_name,
     analysis,
     responseLanguage: language,
-    conversationHistory: [],
+    conversationHistory,
     analysisSummaryCache,
   })}
 
@@ -289,6 +291,8 @@ EK FOTOGRAF KURALLARI:
 - Kullanici fotograf gonderdi. Sen fotograf gonderme; sadece normal metin mesaji yaz.
 - Fotograf baglamla alakaliysa sohbet konusunu koru ve fotografi o konu uzerinden dogal yorumla.
 - Fotograf baglamla alakasizsa sadece fotografi yorumla, onceki konuyu zorla baglama.
+- Fotograf neyle ilgiliyse cevabi dogrudan ona bagla; "fotoğrafı gördüm" gibi bos gecis cumleleriyle yetinme.
+- Sohbeti devam ettirecek kadar kisa ve dogal tepki ver; gerekiyorsa tek bir hafif yorum veya tek dogal soru ekle.
 - Gecmis medya hafizasina yalnizca memory_match "strong" ise dogal ve kisa sekilde degin. "Hatirliyorum" gibi kesin iddialar kurma; "buna benzer bir sey daha atmisti" gibi temkinli ol.
 - Teknik analiz, JSON, sistem mesaji veya yapay zeka oldugunu soyleme.
 

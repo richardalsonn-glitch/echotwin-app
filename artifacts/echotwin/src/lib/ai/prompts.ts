@@ -39,23 +39,22 @@ export function buildAnalysisPrompt(
   requesterName: string,
   messages: Array<{ sender: string; content: string; has_question: boolean; message_length: number }>
 ): string {
-  const targetMessages = messages.filter((m) => m.sender === targetName).slice(-160);
+  const targetMessages = messages.filter((m) => m.sender === targetName);
   const conversationSample = messages
-    .slice(-50)
-    .map((m) => `${m.sender}: ${truncate(m.content, 140)}`)
+    .map((m) => `${m.sender}: ${truncate(m.content, 120)}`)
     .join("\n");
 
-  const formattedMessages = targetMessages.map((m) => truncate(m.content, 220)).join("\n---\n");
+  const formattedMessages = targetMessages.map((m) => truncate(m.content, 180)).join("\n---\n");
 
   return `Sen bir WhatsApp sohbet analistisin. Sana ${targetName} isimli kisinin ${requesterName} ile WhatsApp sohbetinden mesajlar veriyorum. Amacin psikolojik yorum yapmak degil; bu kisinin gercekten nasil yazdigini, hangi kelimeleri sectigini, ne kadar kisa/uzun yazdigini ve hangi durumlarda nasil cevap verdigini cikarmak.
 
-SADECE ${targetName} MESAJLARI:
+SADECE ${targetName} MESAJLARI - TUM YUKLENEN SOHBETTEN:
 ${formattedMessages}
 
-SON KONUSMA BAGLAMI:
+TUM KONUSMA BAGLAMI - KRONOLOJIK:
 ${conversationSample}
 
-GOREV: Bu mesajlari analiz edip asagidaki STRICT JSON formatinda yanit ver. Baska hicbir sey yazma, sadece JSON dondur. Tahmin uydurma; mesajlarda acikca gorulmuyorsa bir tarz ekleme.
+GOREV: Tum sohbeti analiz edip asagidaki STRICT JSON formatinda yanit ver. Baska hicbir sey yazma, sadece JSON dondur. Tahmin uydurma; mesajlarda acikca gorulmuyorsa bir tarz ekleme. Kisinin kullandigi kelimeleri, kisaltmalari, hitaplari ve yazim bicimini veri varsa bire bir yakala.
 
 {
   "avg_message_length": <number>,

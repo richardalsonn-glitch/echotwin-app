@@ -20,6 +20,7 @@ import {
   Camera,
   X,
   ImageOff,
+  Download,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -241,6 +242,32 @@ export default function ProfilePage({
       toast.error("Bağlantı hatası");
     } finally {
       setUploadingAvatar(false);
+    }
+  }
+
+  async function handleExportChat() {
+    try {
+      const res = await fetch(`/api/personas/${personaId}/export`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error((err as { error?: string }).error ?? "Sohbet dışa aktarılamadı");
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const fileNameMatch = disposition.match(/filename="([^"]+)"/);
+      link.href = url;
+      link.download = fileNameMatch?.[1] ?? `${persona?.display_name ?? "sohbet"}-sohbet.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Sohbet txt olarak indirildi");
+    } catch {
+      toast.error("Sohbet dışa aktarılırken bağlantı hatası oluştu");
     }
   }
 
@@ -498,6 +525,15 @@ export default function ProfilePage({
         >
           <MessageCircle className="h-4 w-4" />
           Konuşmaya Git
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full gap-2 rounded-xl border-primary/20 text-primary"
+          onClick={handleExportChat}
+        >
+          <Download className="h-4 w-4" />
+          Sohbeti dışa aktar
         </Button>
 
         {/* Remove avatar (bottom) */}

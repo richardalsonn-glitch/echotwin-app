@@ -105,7 +105,6 @@ export async function POST(request: NextRequest) {
 
     const messagesToStore = parsed.messages
       .filter((message) => !message.is_media)
-      .slice(0, 2000)
       .map((message) => ({
         sender: message.sender,
         content: message.content,
