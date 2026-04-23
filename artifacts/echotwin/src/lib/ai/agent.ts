@@ -18,6 +18,15 @@ const MAX_CHAT_HISTORY_MESSAGES = 40;
 
 const PERSONA_ANALYSIS_SCHEMA = z
   .object({
+    speaking_style_summary: z.string().min(1).optional().default("dogal mesajlasma stili"),
+    emotional_tone: z.string().min(1).optional().default("notr ve dogal"),
+    relationship_dynamic: z.string().min(1).optional().default("dogal sohbet iliskisi"),
+    reply_length_tendency: z.string().min(1).optional().default("kisa/orta dengeli"),
+    curiosity_level: z.coerce.number().finite().min(0).max(10).optional().default(4),
+    directness_level: z.coerce.number().finite().min(0).max(10).optional().default(6),
+    memory_topics: z.array(z.string().min(1)).max(12).optional().default([]),
+    conversation_do_rules: z.array(z.string().min(1)).max(12).optional().default([]),
+    conversation_dont_rules: z.array(z.string().min(1)).max(12).optional().default([]),
     relationship_type: z.string().min(1).optional().default("unknown"),
     warmth_level: z.coerce.number().finite().min(1).max(10).optional().default(5),
     reply_length_preference: z
@@ -139,6 +148,15 @@ function normalizePersonaAnalysis(value: unknown): PersonaAnalysis {
   const moodDistribution = asObject(root.mood_distribution);
 
   return {
+    speaking_style_summary: asString(root.speaking_style_summary, "dogal mesajlasma stili"),
+    emotional_tone: asString(root.emotional_tone, "notr ve dogal"),
+    relationship_dynamic: asString(root.relationship_dynamic, "dogal sohbet iliskisi"),
+    reply_length_tendency: asString(root.reply_length_tendency, "kisa/orta dengeli"),
+    curiosity_level: Math.min(10, Math.max(0, asNumber(root.curiosity_level, 4))),
+    directness_level: Math.min(10, Math.max(0, asNumber(root.directness_level, 6))),
+    memory_topics: asStringArray(root.memory_topics, 12),
+    conversation_do_rules: asStringArray(root.conversation_do_rules, 12),
+    conversation_dont_rules: asStringArray(root.conversation_dont_rules, 12),
     relationship_type: asString(root.relationship_type, "unknown"),
     warmth_level: Math.min(10, Math.max(1, asNumber(root.warmth_level, 5))),
     reply_length_preference: asEnum(
@@ -254,7 +272,7 @@ export async function runPersonaAnalysis(
 ): Promise<PersonaAnalysisResult> {
   const result = await runTextWithFallback<PersonaAnalysis>({
     task: "persona-analysis",
-    maxTokens: 2400,
+    maxTokens: 3200,
     temperature: 0.2,
     responseFormat: "json_object",
     parseResponse: parsePersonaAnalysis,
@@ -407,6 +425,9 @@ function evaluateHumanRealism(
   ];
 
   if (!normalized) reasons.push("empty_reply");
+  if (normalized.length <= 3 && userMessage.trim().length > 18 && !/^(tm|ok|he|yok)$/iu.test(normalized)) {
+    reasons.push("meaningless_short_reply");
+  }
   if (aiPatterns.some((pattern) => normalized.includes(pattern))) {
     reasons.push("ai_phrase");
   }

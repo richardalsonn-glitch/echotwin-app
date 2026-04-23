@@ -1,4 +1,13 @@
 export interface PersonaAnalysis {
+  speaking_style_summary?: string;
+  emotional_tone?: string;
+  relationship_dynamic?: string;
+  reply_length_tendency?: string;
+  curiosity_level?: number;
+  directness_level?: number;
+  memory_topics?: string[];
+  conversation_do_rules?: string[];
+  conversation_dont_rules?: string[];
   relationship_type?: string;
   warmth_level?: number;
   reply_length_preference?: "very_short" | "short" | "mixed" | "medium" | "long";

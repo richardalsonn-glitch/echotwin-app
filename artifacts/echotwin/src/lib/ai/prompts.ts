@@ -31,6 +31,15 @@ type AnalysisSummaryCacheLike = {
     topic_preferences?: string[];
     avoid_patterns?: string[];
     speech_rhythm?: string;
+    speaking_style_summary?: string;
+    emotional_tone?: string;
+    relationship_dynamic?: string;
+    reply_length_tendency?: string;
+    curiosity_level?: number;
+    directness_level?: number;
+    memory_topics?: string[];
+    conversation_do_rules?: string[];
+    conversation_dont_rules?: string[];
   };
 };
 
@@ -56,7 +65,18 @@ ${conversationSample}
 
 GOREV: Tum sohbeti analiz edip asagidaki STRICT JSON formatinda yanit ver. Baska hicbir sey yazma, sadece JSON dondur. Tahmin uydurma; mesajlarda acikca gorulmuyorsa bir tarz ekleme. Kisinin kullandigi kelimeleri, kisaltmalari, hitaplari ve yazim bicimini veri varsa bire bir yakala.
 
+ONEMLI: conversation_do_rules ve conversation_dont_rules alanlari chat motorunun kalite kurallarini belirleyecek. Bu alanlari sadece taklit icin degil; anlamli, tutarli, iliskiye uygun ve sohbeti tasiyabilen cevaplar uretmek icin yaz.
+
 {
+  "speaking_style_summary": <string, kisinin yazis tarzi ve ritmini kisa anlat>,
+  "emotional_tone": <string, duygusal tonu ve sicaklik/mesafe ayarini anlat>,
+  "relationship_dynamic": <string, ${targetName} ile ${requesterName} arasindaki iliski dilini anlat>,
+  "reply_length_tendency": <string, kisa/orta/uzun cevap egilimini ve ne zaman acildigini anlat>,
+  "curiosity_level": <number 0-10>,
+  "directness_level": <number 0-10>,
+  "memory_topics": [<string array, max 12, sohbetten desteklenen ortak konu/kisi/yer/medya temalari>],
+  "conversation_do_rules": [<string array, max 12, kaliteli sohbet icin uygulanacak davranis kurallari>],
+  "conversation_dont_rules": [<string array, max 12, yapmamasi gereken davranislar>],
   "avg_message_length": <number>,
   "relationship_type": <"sibling"|"partner"|"close_friend"|"friend"|"flirt"|"formal"|"distant"|"unknown">,
   "warmth_level": <number 1-10>,
@@ -166,38 +186,90 @@ export function buildChatResponsePrompt(params: {
   const languageInstruction = getChatLanguageInstruction(language);
   const assistantLanguageBlock = buildAssistantLanguageBlock();
   const humanProfile = buildHumanProfileBlock(analysis, summarySignals);
+  const doRules = uniqueStrings([
+    ...(analysis.conversation_do_rules ?? []),
+    ...(summarySignals?.conversation_do_rules ?? []),
+    "Son mesaja dogrudan ve baglamli cevap ver",
+    "Kisa cevap gerekiyorsa bile anlamli ve yeterli tut",
+    "Iliski sicakligi ve hitap tavrini koru",
+    "Sadece desteklenen hafiza ipuclarini kullan",
+  ]).slice(0, 12);
+  const dontRules = uniqueStrings([
+    ...(analysis.conversation_dont_rules ?? []),
+    ...(summarySignals?.conversation_dont_rules ?? []),
+    ...(analysis.avoid_patterns ?? []),
+    ...(summarySignals?.avoid_patterns ?? []),
+    "Sahte ani uydurma",
+    "Robotik aciklama yapma",
+    "Anlamsiz tek kelimelik bos cevap verme",
+    "Her cevabi soru yapma",
+  ]).slice(0, 12);
+  const memoryTopics = uniqueStrings([
+    ...(analysis.memory_topics ?? []),
+    ...(summarySignals?.memory_topics ?? []),
+    ...(analysis.topic_preferences ?? []),
+    ...(summarySignals?.topic_preferences ?? []),
+  ]).slice(0, 12);
+  const speakingStyleSummary =
+    analysis.speaking_style_summary ??
+    summarySignals?.speaking_style_summary ??
+    analysis.tone_style;
+  const emotionalTone =
+    analysis.emotional_tone ??
+    summarySignals?.emotional_tone ??
+    analysis.affection_style ??
+    toneProfile;
+  const relationshipDynamic =
+    analysis.relationship_dynamic ??
+    summarySignals?.relationship_dynamic ??
+    relationshipContext;
+  const replyLengthTendency =
+    analysis.reply_length_tendency ??
+    summarySignals?.reply_length_tendency ??
+    lengthGuide;
+  const curiosityLevel =
+    analysis.curiosity_level ?? summarySignals?.curiosity_level ?? Math.round((analysis.question_frequency ?? 0.2) * 10);
+  const directnessLevel =
+    analysis.directness_level ?? summarySignals?.directness_level ?? (analysis.argument_style.toLowerCase().includes("dolayli") ? 4 : 7);
 
-  return `Sen ${params.targetName}'sin. ${params.requesterName} ile WhatsApp'ta konusuyorsun. Bu bir asistan konusmasi degil; sen sadece ${params.targetName}'in dogal mesajlasma tarzini taklit ediyorsun.
+  return `SYSTEM PROMPT:
+Siz, yuklenen sohbet gecmisinden ogrenilmis bir konusma stiline ve iliski baglamina sahip dijital personasiniz.
+Amaciniz birebir mekanik klonlama yapmak degil; kullanicinin karsisinda gercekten ${params.targetName} varmis hissi yaratacak kadar dogal, iliskisel ve tutarli bir sohbet deneyimi sunmaktir.
+Stil transferi yap, iliski hafizasini kullan, konusma akisini koru. Ama anlamsiz, kopuk, robotik veya asiri duzgun cevap verme.
 
-OZET KATMANI:
-- Bu kisi kullaniciyla kim: ${relationshipContext}
-- Samimiyet/sicaklik seviyesi: ${analysis.warmth_level ?? summarySignals?.warmth_level ?? analysis.affection_level}/10
-- Ton profili: ${toneProfile}
-- Konusma enerjisi: ${analysis.initiative_level ?? summarySignals?.initiative_level ?? "medium"}
-- Baskin ritim: ${analysis.speech_rhythm ?? summarySignals?.speech_rhythm ?? "dogal ve kisa"}
-- Cevap uzunlugu degiskenligi: ${replyVariability}
-- Kisa/uzun mesaj dengesi: ${lengthGuide}
+PERSONA RULES:
+- Konusan persona: ${params.targetName}
+- Kullanici: ${params.requesterName}
+- Konusma stili ozeti: ${speakingStyleSummary}
+- Duygusal ton: ${emotionalTone}
+- Cevap uzunlugu egilimi: ${replyLengthTendency}
+- Konusma ritmi: ${analysis.speech_rhythm ?? summarySignals?.speech_rhythm ?? "dogal ve kisa/orta"}
+- Merak seviyesi: ${curiosityLevel}/10
+- Direktlik seviyesi: ${directnessLevel}/10
 - Emoji kullanimi: ${analysis.emoji_usage?.frequency}${commonEmojis.length ? `, yaygin emojiler: ${commonEmojis.join(" ")}` : ""}
 - Yazim/kucuk harf toleransi: ${lowercaseGuide}
 - Typo toleransi: ${typoGuide}
+
+RELATION CONTEXT:
+- Iliski tipi: ${relationshipContext}
+- Iliski dinamigi: ${relationshipDynamic}
+- Samimiyet/sicaklik seviyesi: ${analysis.warmth_level ?? summarySignals?.warmth_level ?? analysis.affection_level}/10
+- Konusma enerjisi: ${analysis.initiative_level ?? summarySignals?.initiative_level ?? "medium"}
 - Karsi soru egilimi: ${questionGuide}
 - Soru sorma orani: ${analysis.question_frequency ?? summarySignals?.question_ratio ?? analysis.short_reply_ratio}
-- Sevmedigi kaliplar: ${[
-    ...(analysis.avoid_patterns ?? []),
-    ...(summarySignals?.avoid_patterns ?? []),
-    ...(analysis.do_not_behaviors ?? []),
-  ]
-    .slice(0, 12)
-    .join(", ") || "belirgin yok"}
 
-KISIYE OZGU STIL PROFILI:
+MEMORY CONTEXT:
+- Desteklenen hafiza konulari: ${memoryTopics.join(", ") || "belirgin destekli konu yok"}
+- Sadece bu listede veya son sohbet baglaminda desteklenen seyleri hatirlamis gibi kullan.
+- Sahte ani, sahte olay, sahte ortak gecmis veya kanitsiz medya detayi uydurma.
+
+STYLE SIGNALS:
 ${humanProfile}
 
 GERCEK MESAJ KALIPLARI:
 ${styleExamples}
 
 SIK KULLANDIGI IFADELER: ${commonPhrases.join(", ") || "yok"}
-ASLA YAPMAMASI GEREKENLER: ${(analysis.do_not_behaviors ?? []).join(", ") || "belirgin yasak yok"}
 
 SON SOHBET BAGLAMI:
 ${recentConversation}
@@ -205,24 +277,26 @@ ${recentConversation}
 SON 10 MESAJ - DAHA YUKSEK AGIRLIK:
 ${highWeightConversation}
 
-DAVRANIS KURALLARI:
-1. En son kullanici mesajina dogrudan cevap ver; konuyu gereksiz genisletme.
-2. Aciklama yapma. Yardimci asistan gibi dusunme; sadece gercek DM cevabi yaz.
-3. Her cevap soru sormasin. Soru sadece gercekten o kisi soracaksa gelsin.
-4. Cevap uzunlugu tek tip olmasin: bazen tek kelime, bazen eksiltili, bazen 2 kisa satir.
-5. Iki balon hissi gerekiyorsa satir atlayarak 2 kisa mesaj yazabilirsin.
-6. Asiri duzgun noktalama, kitap gibi Turkce ve yapay nezaket kullanma.
-7. "Tabii", "Elbette", "Memnuniyetle", "Sana yardimci olabilirim", "Anliyorum", "Bu durumda", "Dilersen" kaliplarini kullanma.
-8. ${questionGuide}
-9. ${lowercaseGuide}
-10. ${typoGuide}
-11. ${languageInstruction}
-12. Iliski kardes/arkadas/flort ise fazla resmi olma; mesafeli/resmi kisiyse samimiyeti zorlama.
-13. Kisi kisa konusuyorsa uzatma; duygusal konusuyorsa hafif sicaklik ekle; mesafeliyse mesafeyi koru.
-14. Sokak dili veya argo sadece veride varsa kullan; zorlama.
-15. Sadece mesaj metnini yaz; tirnak, isim etiketi, sahne tarifi veya parantez ici aciklama ekleme.
+CONVERSATION DO RULES:
+${doRules.map((rule) => `- ${rule}`).join("\n")}
 
-EK HIZA NOTU:
+CONVERSATION DON'T RULES:
+${dontRules.map((rule) => `- ${rule}`).join("\n")}
+
+RESPONSE POLICY:
+- En son kullanici mesajina dogrudan cevap ver; konu akisini koparma.
+- Stili koru ama iletisimi bozma. Cok kisa cevap veriyorsan bile bos ve anlamsiz kalmasin.
+- Gerektiginde kisa ama yeterli cevap ver; kullaniciyi yarim birakma.
+- Cevaplar bazen kisa, bazen daha sicak, bazen daha mesafeli, bazen soru soran, bazen tepki veren dogal akis tasiyabilir.
+- Konusmayi tasiyabil: gerekli oldugunda yorum yap, ilgi goster veya tek dogal soru sor.
+- Her cevabi soru yapma; her cevabi empati cumlesi de yapma.
+- Asiri resmi, ogretmen gibi, steril, kitap gibi veya yardimci asistan gibi olma.
+- Dogal kusurlar olabilir ama kaliteyi bozacak sacmalik, kopukluk veya uydurma olmasin.
+- Iliski kardes/arkadas/flort ise fazla resmi olma; mesafeli/resmi kisiyse samimiyeti zorlama.
+- ${languageInstruction}
+- Sadece mesaj metnini yaz; tirnak, isim etiketi, sahne tarifi veya parantez ici aciklama ekleme.
+
+AI TONE KORUMASI:
 ${assistantLanguageBlock}`;
 }
 
@@ -302,7 +376,22 @@ function buildHumanProfileBlock(
   summarySignals: AnalysisSummaryCacheLike["deterministic_signals"] | undefined
 ): string {
   const lines = [
+    `speaking_style_summary: ${
+      analysis.speaking_style_summary ?? summarySignals?.speaking_style_summary ?? analysis.tone_style
+    }`,
+    `emotional_tone: ${
+      analysis.emotional_tone ?? summarySignals?.emotional_tone ?? "notr ve dogal"
+    }`,
+    `relationship_dynamic: ${
+      analysis.relationship_dynamic ?? summarySignals?.relationship_dynamic ?? "dogal sohbet iliskisi"
+    }`,
     `relationship_type: ${analysis.relationship_type ?? summarySignals?.relationship_type ?? "unknown"}`,
+    `memory_topics: ${uniqueStrings([
+      ...(analysis.memory_topics ?? []),
+      ...(summarySignals?.memory_topics ?? []),
+    ])
+      .slice(0, 12)
+      .join(", ") || "belirgin degil"}`,
     `reply_length_preference: ${
       analysis.reply_length_preference ?? summarySignals?.reply_length_preference ?? "mixed"
     }`,

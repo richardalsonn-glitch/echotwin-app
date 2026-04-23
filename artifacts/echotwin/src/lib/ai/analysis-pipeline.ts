@@ -45,6 +45,15 @@ export type AnalysisSummaryCache = {
 };
 
 type DeterministicSignals = {
+  speaking_style_summary: string;
+  emotional_tone: string;
+  relationship_dynamic: string;
+  reply_length_tendency: string;
+  curiosity_level: number;
+  directness_level: number;
+  memory_topics: string[];
+  conversation_do_rules: string[];
+  conversation_dont_rules: string[];
   avg_message_length: number;
   short_reply_ratio: number;
   question_ratio: number;
@@ -249,8 +258,40 @@ function extractDeterministicSignals(targetMessages: CachedChatMessage[]): Deter
   const lowercaseTolerance = detectLowercaseTolerance(lowercaseRatio);
   const typoTolerance = detectTypoTolerance(usesAbbreviations, lowercaseTolerance);
   const emojiFrequency = getEmojiFrequency(commonEmojis.length, contents.length);
+  const topicPreferences = extractTopicPreferences(contents);
+  const relationshipType = inferRelationshipType({
+    shortReplyRatio,
+    avgLength,
+    questionRatio,
+    emojiCount: commonEmojis.length,
+    usesAbbreviations,
+  });
+  const replyLengthPreference = inferReplyLengthPreference(avgLength, shortReplyRatio);
+  const speechRhythm = inferSpeechRhythm(avgLength, shortReplyRatio, questionRatio);
+  const toneProfile = inferToneProfile(avgLength, shortReplyRatio, commonEmojis.length);
+  const relationshipContext = inferRelationshipContext({
+    avgLength,
+    shortReplyRatio,
+    questionRatio,
+    emojiCount: commonEmojis.length,
+    usesAbbreviations,
+  });
 
   return {
+    speaking_style_summary: buildSpeakingStyleSummary({
+      toneProfile,
+      speechRhythm,
+      usesAbbreviations,
+      lowercaseTolerance,
+    }),
+    emotional_tone: buildEmotionalTone(commonEmojis.length, inferAffectionLevel(contents), toneProfile),
+    relationship_dynamic: buildRelationshipDynamic(relationshipType, relationshipContext),
+    reply_length_tendency: buildReplyLengthTendency(replyLengthPreference, avgLength, shortReplyRatio),
+    curiosity_level: Math.min(10, Math.round(questionRatio * 30)),
+    directness_level: inferDirectnessLevel(contents),
+    memory_topics: topicPreferences,
+    conversation_do_rules: buildConversationDoRules(replyLengthPreference, relationshipType),
+    conversation_dont_rules: buildConversationDontRules(relationshipType),
     avg_message_length: Math.round(avgLength),
     short_reply_ratio: roundRatio(shortReplyRatio),
     question_ratio: roundRatio(questionRatio),
@@ -261,26 +302,14 @@ function extractDeterministicSignals(targetMessages: CachedChatMessage[]): Deter
     language_mix: detectLanguageMix(contents),
     sends_multiple_messages: shortReplyRatio > 0.58 && avgLength < 75,
     uses_abbreviations: usesAbbreviations,
-    relationship_context: inferRelationshipContext({
-      avgLength,
-      shortReplyRatio,
-      questionRatio,
-      emojiCount: commonEmojis.length,
-      usesAbbreviations,
-    }),
-    tone_profile: inferToneProfile(avgLength, shortReplyRatio, commonEmojis.length),
+    relationship_context: relationshipContext,
+    tone_profile: toneProfile,
     reply_length_variability: inferReplyLengthVariability(shortReplyRatio, avgLength),
     lowercase_tolerance: lowercaseTolerance,
     typo_tolerance: typoTolerance,
-    relationship_type: inferRelationshipType({
-      shortReplyRatio,
-      avgLength,
-      questionRatio,
-      emojiCount: commonEmojis.length,
-      usesAbbreviations,
-    }),
+    relationship_type: relationshipType,
     warmth_level: inferAffectionLevel(contents),
-    reply_length_preference: inferReplyLengthPreference(avgLength, shortReplyRatio),
+    reply_length_preference: replyLengthPreference,
     initiative_level: inferInitiativeLevel(questionRatio, avgLength),
     emoji_habit: emojiFrequency,
     lowercase_ratio: roundRatio(lowercaseRatio),
@@ -288,9 +317,9 @@ function extractDeterministicSignals(targetMessages: CachedChatMessage[]): Deter
     affection_style: inferAffectionStyle(contents),
     conflict_style: inferConflictStyle(contents),
     delay_style: shortReplyRatio > 0.65 ? "hizli ve kisa cevaplar" : "normal ritim",
-    topic_preferences: extractTopicPreferences(contents),
+    topic_preferences: topicPreferences,
     avoid_patterns: ["asistan dili", "gereksiz aciklama", "fazla resmi cevap"],
-    speech_rhythm: inferSpeechRhythm(avgLength, shortReplyRatio, questionRatio),
+    speech_rhythm: speechRhythm,
   };
 }
 
@@ -306,6 +335,15 @@ function buildBasicPersonaAnalysis(
     .slice(-12);
 
   return {
+    speaking_style_summary: signals.speaking_style_summary,
+    emotional_tone: signals.emotional_tone,
+    relationship_dynamic: signals.relationship_dynamic,
+    reply_length_tendency: signals.reply_length_tendency,
+    curiosity_level: signals.curiosity_level,
+    directness_level: signals.directness_level,
+    memory_topics: signals.memory_topics,
+    conversation_do_rules: signals.conversation_do_rules,
+    conversation_dont_rules: signals.conversation_dont_rules,
     relationship_type: signals.relationship_type,
     warmth_level: signals.warmth_level,
     reply_length_preference: signals.reply_length_preference,
@@ -579,6 +617,99 @@ function inferSpeechRhythm(
   if (questionRatio > 0.25) return "cevap + kisa soru ritmi";
   if (avgLength > 120) return "orta uzunlukta ama sohbet dili";
   return "kisa/orta dalgalanan rahat ritim";
+}
+
+function buildSpeakingStyleSummary(params: {
+  toneProfile: string;
+  speechRhythm: string;
+  usesAbbreviations: boolean;
+  lowercaseTolerance: "low" | "medium" | "high";
+}): string {
+  const abbreviationNote = params.usesAbbreviations ? "kisaltma kullanir" : "kisaltma belirgin degil";
+  const caseNote =
+    params.lowercaseTolerance === "high"
+      ? "kucuk harfe yatkin"
+      : params.lowercaseTolerance === "medium"
+        ? "rahat yazim kullanir"
+        : "daha temiz yazar";
+  return `${params.toneProfile}; ${params.speechRhythm}; ${abbreviationNote}; ${caseNote}`;
+}
+
+function buildEmotionalTone(emojiCount: number, warmthLevel: number, toneProfile: string): string {
+  if (warmthLevel >= 8) return "sicak, yakin ve duyguyu saklamayan";
+  if (warmthLevel <= 3) return "mesafeli, kontrollu ve az duygusal";
+  if (emojiCount > 2) return "rahat, samimi ve hafif sicak";
+  return toneProfile;
+}
+
+function buildRelationshipDynamic(relationshipType: string, relationshipContext: string): string {
+  if (relationshipType === "flirt") return `flortoz ama zorlamayan; ${relationshipContext}`;
+  if (relationshipType === "close_friend") return `rahat arkadas dili; ${relationshipContext}`;
+  if (relationshipType === "partner") return `yakin ve ozel iliski dili; ${relationshipContext}`;
+  if (relationshipType === "distant") return `mesafeli ve kontrollu; ${relationshipContext}`;
+  if (relationshipType === "formal") return `daha resmi ve dikkatli; ${relationshipContext}`;
+  return relationshipContext;
+}
+
+function buildReplyLengthTendency(
+  preference: "very_short" | "short" | "mixed" | "medium" | "long",
+  avgLength: number,
+  shortReplyRatio: number
+): string {
+  if (preference === "very_short") return "cok kisa yazar ama bos cevap vermemeli";
+  if (preference === "short") return "kisa cevap verir; gerekirse tek ek cumleyle tamamlar";
+  if (preference === "long") return "daha uzun anlatabilir ama sohbet dilinden kopmamalidir";
+  if (preference === "medium") return "orta uzunlukta, anlamli ve baglamli cevaplara yatkin";
+  return `degisken; ortalama ${Math.round(avgLength)} karakter, kisa cevap orani ${roundRatio(shortReplyRatio)}`;
+}
+
+function inferDirectnessLevel(contents: string[]): number {
+  const joined = contents.join(" ").toLocaleLowerCase("tr-TR");
+  const directHits = (joined.match(/\b(hayir|yok|istemiyorum|olmaz|tamam|gel|git|yapma)\b/gu) ?? [])
+    .length;
+  const softHits = (joined.match(/\b(belki|bilmiyorum|bakalim|olabilir|sanirim)\b/gu) ?? []).length;
+  return Math.min(10, Math.max(2, 5 + directHits - softHits));
+}
+
+function buildConversationDoRules(
+  preference: "very_short" | "short" | "mixed" | "medium" | "long",
+  relationshipType: string
+): string[] {
+  const rules = [
+    "son mesaja baglamli ve dogrudan cevap ver",
+    "kisa cevap gerekiyorsa bile anlamli tut",
+    "konu akisini koru",
+    "gerektiginde sohbeti ilerletecek tek dogal yorum veya soru ekle",
+    "sadece desteklenen hafiza ipuclarini kullan",
+  ];
+
+  if (preference === "very_short" || preference === "short") {
+    rules.push("gereksiz uzatma ama kullaniciyi yarim birakma");
+  }
+  if (relationshipType === "flirt" || relationshipType === "partner") {
+    rules.push("sicakligi abartmadan hissettir");
+  }
+  if (relationshipType === "distant" || relationshipType === "formal") {
+    rules.push("mesafeyi koru ve samimiyeti zorlama");
+  }
+
+  return rules;
+}
+
+function buildConversationDontRules(relationshipType: string): string[] {
+  const rules = [
+    "sahte ani uydurma",
+    "asistan gibi aciklama yapma",
+    "ogretmen gibi uzun anlatma",
+    "anlamsiz tek kelimelik bos cevap verme",
+    "her seye asiri duygusal tepki verme",
+  ];
+
+  if (relationshipType === "distant" || relationshipType === "formal") {
+    rules.push("ani samimiyet ve flort tonu kullanma");
+  }
+
+  return rules;
 }
 
 function describeAnalysisFallback(error: unknown): { code: string; message: string } {
