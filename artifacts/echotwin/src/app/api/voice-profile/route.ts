@@ -9,6 +9,7 @@ import {
   validateVoiceSampleFile,
   VOICE_SAMPLE_BUCKET,
 } from "@/lib/voice/profile";
+import { createVoiceClone } from "@/lib/voice/elevenlabs";
 
 export const runtime = "nodejs";
 
@@ -100,7 +101,16 @@ export async function POST(request: NextRequest) {
       .from(VOICE_SAMPLE_BUCKET)
       .getPublicUrl(storagePath);
 
-    const metadata = createVoiceProfileMetadata(audio, storagePath, now);
+    const clone = await createVoiceClone({
+      name: `${persona.display_name ?? persona.target_name} - ${personaId}`,
+      audioSample: audio,
+      description: "BendekiSen persona voice profile",
+    });
+    const metadata = {
+      ...createVoiceProfileMetadata(audio, storagePath, now),
+      provider: "elevenlabs" as const,
+      elevenlabs_voice_id: clone.voiceId,
+    };
     const { data: updatedPersona, error: updateError } = await supabase
       .from("personas")
       .update({

@@ -1,5 +1,5 @@
 import { getModelRoute } from "./models";
-import { createOpenRouterProvider } from "./openrouter";
+import { createGeminiProvider } from "./gemini-provider";
 import type {
   AiAttempt,
   AiStreamRequest,
@@ -63,7 +63,7 @@ function buildFailedAttempt(
       });
 
   return {
-    provider: "openrouter",
+    provider: "gemini",
     task: request.task,
     model,
     status: "failed",
@@ -78,7 +78,7 @@ function buildSuccessAttempt(
   model: string
 ): AiAttempt {
   return {
-    provider: "openrouter",
+    provider: "gemini",
     task: request.task,
     model,
     status: "success",
@@ -107,7 +107,7 @@ function buildFinalError(attempts: AiAttempt[], cause: unknown): AiServiceError 
 
 export async function runTextWithFallback(request: AiTextRequest): Promise<AiTextResult> {
   const route = getModelRoute(request.task);
-  const provider = createOpenRouterProvider();
+  const provider = createGeminiProvider();
   const attempts: AiAttempt[] = [];
   let lastError: unknown;
 
@@ -159,7 +159,7 @@ export async function runStreamWithFallback(
   request: AiStreamRequest
 ): Promise<AiStreamResult> {
   const route = getModelRoute(request.task);
-  const provider = createOpenRouterProvider();
+  const provider = createGeminiProvider();
   const attempts: AiAttempt[] = [];
   let lastError: unknown;
 

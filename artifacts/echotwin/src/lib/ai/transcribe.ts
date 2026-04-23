@@ -1,86 +1,47 @@
-import OpenAI from "openai";
-import { AiServiceError } from "./types";
 import { MAX_AUDIO_BYTES } from "@/lib/media/limits";
+import { generateGeminiAudio } from "@/lib/ai/gemini";
+import { AiServiceError } from "@/lib/ai/types";
 
 export const TRANSCRIBE_MIN_AUDIO_BYTES = 1024;
 export const TRANSCRIBE_MAX_AUDIO_BYTES = MAX_AUDIO_BYTES;
 
-type ProviderErrorShape = {
-  status?: number;
-  code?: string | null;
-  type?: string | null;
-  message?: string;
-  error?: {
-    code?: string | null;
-    type?: string | null;
-    message?: string;
-  };
-};
-
 export type TranscriptionResult = {
   text: string;
   model: string;
-  provider: "openai";
+  provider: "gemini";
 };
 
 export async function transcribeAudio(file: File): Promise<TranscriptionResult> {
   validateAudioFile(file);
 
-  const model = getTranscriptionModel();
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const raw = await generateGeminiAudio({
+    prompt:
+      "Bu ses kaydindaki konusmayi asagidaki kurallarla yaziya cevir. Sadece duz metin dondur, aciklama ekleme. Konusma Turkce ise Turkce yaz.",
+    audio: {
+      mimeType: file.type || "audio/webm",
+      base64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+    },
+    temperature: 0.1,
+    maxOutputTokens: 1024,
+  });
 
-  try {
-    const client = createTranscriptionClient();
-    const transcription = await client.audio.transcriptions.create({
-      file,
-      model,
-      language: "tr",
-      response_format: "json",
-    });
-
-    const text = transcription.text.trim();
-    if (!text) {
-      throw new AiServiceError({
-        code: "ai_invalid_response",
-        message: "Transcription returned empty text",
-        userMessage: "Ses mesajı okunamadı, tekrar dene",
-        status: 422,
-      });
-    }
-
-    return {
-      text,
-      model,
-      provider: "openai",
-    };
-  } catch (error) {
-    throw normalizeTranscriptionError(error);
-  }
-}
-
-function createTranscriptionClient(): OpenAI {
-  const apiKey =
-    getOptionalEnv("AI_TRANSCRIBE_OPENAI_API_KEY") ??
-    getOptionalEnv("AI_INTEGRATIONS_OPENAI_API_KEY");
-
-  if (!apiKey) {
+  const text = normalizeTranscript(raw);
+  if (!text) {
     throw new AiServiceError({
-      code: "ai_config_missing",
-      message: "OpenAI transcription API key is not configured",
-      userMessage: "Ses yazıya çevirme servisi ayarlı değil",
-      status: 500,
+      code: "ai_invalid_response",
+      message: "Gemini returned empty transcription",
+      userMessage: "Ses mesajı okunamadı, tekrar dene",
+      status: 422,
+      retryable: true,
     });
   }
 
-  const baseURL =
-    getOptionalEnv("AI_TRANSCRIBE_OPENAI_BASE_URL") ??
-    getOptionalEnv("AI_INTEGRATIONS_OPENAI_BASE_URL") ??
-    "https://api.openai.com/v1";
-
-  return new OpenAI({ apiKey, baseURL });
-}
-
-function getTranscriptionModel(): string {
-  return getOptionalEnv("AI_TRANSCRIBE_OPENAI_MODEL") ?? "gpt-4o-mini-transcribe";
+  return {
+    text,
+    model,
+    provider: "gemini",
+  };
 }
 
 function validateAudioFile(file: File) {
@@ -112,53 +73,10 @@ function validateAudioFile(file: File) {
   }
 }
 
-function normalizeTranscriptionError(error: unknown): AiServiceError {
-  if (error instanceof AiServiceError) return error;
-
-  const err = getProviderErrorShape(error);
-  const status = err.status ?? 500;
-  const rawCode = err.error?.code ?? err.code ?? err.error?.type ?? err.type ?? "stt_error";
-  const rawMessage =
-    err.error?.message ??
-    err.message ??
-    (error instanceof Error ? error.message : "Unknown transcription error");
-
-  if (status === 401 || status === 403) {
-    return new AiServiceError({
-      code: "ai_auth_failed",
-      message: `${rawCode}: ${rawMessage}`,
-      userMessage: "Ses yazıya çevirme servisi yetkilendirilemedi",
-      status: 500,
-      cause: error,
-    });
-  }
-
-  if (status === 429) {
-    return new AiServiceError({
-      code: "ai_rate_limited",
-      message: `${rawCode}: ${rawMessage}`,
-      userMessage: "Ses yazıya çevirme servisi yoğun, biraz sonra tekrar dene",
-      status,
-      retryable: true,
-      cause: error,
-    });
-  }
-
-  return new AiServiceError({
-    code: status >= 500 ? "ai_provider_unavailable" : "ai_error",
-    message: `${rawCode}: ${rawMessage}`,
-    userMessage: "Ses mesajı okunamadı, tekrar dene",
-    status,
-    retryable: status >= 500,
-    cause: error,
-  });
-}
-
-function getProviderErrorShape(error: unknown): ProviderErrorShape {
-  return typeof error === "object" && error !== null ? (error as ProviderErrorShape) : {};
-}
-
-function getOptionalEnv(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value ? value : undefined;
+function normalizeTranscript(text: string): string {
+  const trimmed = text
+    .replace(/^```(?:text)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  return trimmed;
 }

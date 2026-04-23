@@ -3,7 +3,7 @@ import type { PersonaAnalysis } from "@/types/persona";
 
 export type AiTask = "persona-analysis" | "persona-chat" | "fast-reply";
 
-export type AiProviderName = "openrouter";
+export type AiProviderName = "gemini";
 
 export type AiMessage = Extract<
   ChatCompletionMessageParam,

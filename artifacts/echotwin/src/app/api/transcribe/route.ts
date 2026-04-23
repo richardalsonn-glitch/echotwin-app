@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAiErrorResponse } from "@/lib/ai/errors";
 import { isAiServiceError } from "@/lib/ai/types";
-import {
-  TRANSCRIBE_MAX_AUDIO_BYTES,
-  TRANSCRIBE_MIN_AUDIO_BYTES,
-  transcribeAudio,
-} from "@/lib/ai/transcribe";
+import { TRANSCRIBE_MAX_AUDIO_BYTES, TRANSCRIBE_MIN_AUDIO_BYTES, transcribeAudio } from "@/lib/ai/transcribe";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";

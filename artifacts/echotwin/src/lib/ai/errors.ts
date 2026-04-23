@@ -64,7 +64,7 @@ export function getAiErrorResponse(error: unknown): AiErrorResponse {
       code: "ai_auth_failed",
       status: 500,
       message:
-        "AI API anahtari gecersiz veya eksik. OPENROUTER_API_KEY veya AI_INTEGRATIONS_OPENAI_API_KEY degerini kontrol et.",
+        "AI API anahtari gecersiz veya eksik. GEMINI_API_KEY degerini kontrol et.",
     };
   }
 

@@ -1,23 +1,7 @@
-import OpenAI from "openai";
-import type {
-  ChatCompletionContentPart,
-  ChatCompletionMessageParam,
-} from "openai/resources/chat/completions";
-import { AiServiceError } from "./types";
+import { generateGeminiImage } from "@/lib/ai/gemini";
+import { AiServiceError } from "@/lib/ai/types";
 import type { MediaMemoryItem } from "@/lib/media/memory";
 import { buildMediaMemorySummary, getComparableImageMemories } from "@/lib/media/memory";
-
-type ProviderErrorShape = {
-  status?: number;
-  code?: string | null;
-  type?: string | null;
-  message?: string;
-  error?: {
-    code?: string | null;
-    type?: string | null;
-    message?: string;
-  };
-};
 
 export type ImageTopicRelation = "related" | "unrelated" | "unclear";
 export type ImageMemoryMatch = "none" | "weak" | "strong";
@@ -40,70 +24,18 @@ export type ChatImageAnalysisInput = {
 export async function analyzeChatImage(
   input: ChatImageAnalysisInput
 ): Promise<ChatImageAnalysis> {
-  const client = createImageClient();
-  const model = getImageModel();
-  const comparableMemories = getComparableImageMemories(input.mediaMemory, 3);
-  const content: ChatCompletionContentPart[] = [
-    {
-      type: "text",
-      text: buildImagePrompt(input),
-    },
-    {
-      type: "image_url",
-      image_url: {
-        url: input.imageUrl,
-        detail: "auto",
-      },
-    },
-  ];
-
-  comparableMemories.forEach((memory, index) => {
-    if (!memory.storage_url) return;
-    content.push({
-      type: "text",
-      text: `Gecmis fotograf ${index + 1}: ${memory.file_name ?? "isimsiz"}; baglam: ${[
-        ...memory.context_before,
-        ...memory.context_after,
-      ]
-        .filter(Boolean)
-        .join(" / ")}`,
-    });
-    content.push({
-      type: "image_url",
-      image_url: {
-        url: memory.storage_url,
-        detail: "low",
-      },
-    });
+  const image = await loadImageAsBase64(input.imageUrl);
+  const raw = await generateGeminiImage({
+    systemInstruction:
+      "Sen sohbet icinde gonderilen fotograflari tarafsiz analiz eden bir servis katmanisin. Sadece JSON dondur.",
+    prompt: buildImagePrompt(input),
+    image,
+    temperature: 0.15,
+    maxOutputTokens: 900,
+    json: true,
   });
 
-  try {
-    const messages: ChatCompletionMessageParam[] = [
-      {
-        role: "system",
-        content:
-          "Sen sohbet icinde gonderilen fotograflari tarafsiz analiz eden bir servis katmanisin. Sadece JSON dondur.",
-      },
-      {
-        role: "user",
-        content,
-      },
-    ];
-    const completion = await client.chat.completions.create(
-      {
-        model,
-        messages,
-        max_tokens: 700,
-        temperature: 0.15,
-        response_format: { type: "json_object" },
-      },
-      { timeout: 45_000 }
-    );
-
-    return normalizeImageAnalysis(completion.choices[0]?.message?.content ?? "");
-  } catch (error) {
-    throw normalizeImageError(error);
-  }
+  return normalizeImageAnalysis(raw);
 }
 
 export function createFallbackImageAnalysis(caption: string | null): ChatImageAnalysis {
@@ -119,6 +51,16 @@ export function createFallbackImageAnalysis(caption: string | null): ChatImageAn
 }
 
 function buildImagePrompt(input: ChatImageAnalysisInput): string {
+  const comparableMemories = getComparableImageMemories(input.mediaMemory, 3);
+  const memoryHints = comparableMemories
+    .map((memory, index) => {
+      const context = [...memory.context_before, ...memory.context_after]
+        .filter(Boolean)
+        .join(" / ");
+      return `Gecmis fotograf ${index + 1}: ${memory.file_name ?? "isimsiz"}; baglam: ${context}`;
+    })
+    .join("\n");
+
   return `Kullanici sohbet icinde bir fotograf gonderdi.
 
 Fotograf notu: ${input.caption?.trim() || "Yok"}
@@ -128,6 +70,7 @@ ${input.conversationContext || "Yeterli sohbet baglami yok."}
 
 Gecmis medya hafizasi:
 ${buildMediaMemorySummary(input.mediaMemory)}
+${memoryHints ? `\nKarsilastirma ipuclari:\n${memoryHints}` : ""}
 
 Gorev:
 1. Guncel fotografi kisa ve somut analiz et.
@@ -143,6 +86,25 @@ JSON semasi:
   "memory_match": "none" | "weak" | "strong",
   "memory_note": string | null
 }`;
+}
+
+async function loadImageAsBase64(imageUrl: string): Promise<{ mimeType: string; base64: string }> {
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new AiServiceError({
+      code: "ai_invalid_response",
+      message: `Image download failed: ${response.status}`,
+      userMessage: "Fotograf analiz icin okunamadi",
+      status: 502,
+      retryable: true,
+    });
+  }
+  const contentType = response.headers.get("content-type") ?? "image/jpeg";
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return {
+    mimeType: contentType,
+    base64: buffer.toString("base64"),
+  };
 }
 
 function normalizeImageAnalysis(raw: string): ChatImageAnalysis {
@@ -172,62 +134,6 @@ function parseJsonObject(text: string): unknown {
   }
 }
 
-function createImageClient(): OpenAI {
-  const apiKey =
-    getOptionalEnv("AI_IMAGE_OPENROUTER_API_KEY") ??
-    getOptionalEnv("OPENROUTER_API_KEY") ??
-    getOptionalEnv("AI_INTEGRATIONS_OPENAI_API_KEY");
-
-  if (!apiKey) {
-    throw new AiServiceError({
-      code: "ai_config_missing",
-      message: "Image analysis API key is not configured",
-      userMessage: "Fotograf analiz servisi ayarli degil",
-      status: 500,
-    });
-  }
-
-  return new OpenAI({
-    apiKey,
-    baseURL:
-      getOptionalEnv("AI_IMAGE_OPENROUTER_BASE_URL") ??
-      getOptionalEnv("OPENROUTER_BASE_URL") ??
-      getOptionalEnv("AI_INTEGRATIONS_OPENAI_BASE_URL") ??
-      "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      ...(getOptionalEnv("OPENROUTER_APP_URL")
-        ? { "HTTP-Referer": getOptionalEnv("OPENROUTER_APP_URL") }
-        : {}),
-      "X-OpenRouter-Title": getOptionalEnv("OPENROUTER_APP_NAME") ?? "BendekiSen",
-    },
-  });
-}
-
-function getImageModel(): string {
-  return getOptionalEnv("AI_IMAGE_OPENROUTER_MODEL") ?? "openai/gpt-4o-mini";
-}
-
-function normalizeImageError(error: unknown): AiServiceError {
-  if (error instanceof AiServiceError) return error;
-
-  const err = getProviderErrorShape(error);
-  const status = err.status ?? 500;
-  const rawCode = err.error?.code ?? err.code ?? err.error?.type ?? err.type ?? "image_error";
-  const rawMessage =
-    err.error?.message ??
-    err.message ??
-    (error instanceof Error ? error.message : "Unknown image analysis error");
-
-  return new AiServiceError({
-    code: status >= 500 ? "ai_provider_unavailable" : "ai_error",
-    message: `${rawCode}: ${rawMessage}`,
-    userMessage: "Fotograf yorumlanamadi",
-    status,
-    retryable: status === 429 || status >= 500,
-    cause: error,
-  });
-}
-
 function asObject(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
@@ -248,13 +154,4 @@ function asTopicRelation(value: unknown): ImageTopicRelation {
 
 function asMemoryMatch(value: unknown): ImageMemoryMatch {
   return value === "weak" || value === "strong" ? value : "none";
-}
-
-function getProviderErrorShape(error: unknown): ProviderErrorShape {
-  return typeof error === "object" && error !== null ? (error as ProviderErrorShape) : {};
-}
-
-function getOptionalEnv(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value ? value : undefined;
 }

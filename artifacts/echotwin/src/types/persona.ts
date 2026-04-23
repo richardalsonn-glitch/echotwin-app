@@ -70,7 +70,8 @@ export interface VoiceProfileMetadata {
   size_bytes: number;
   storage_path: string;
   uploaded_at: string;
-  provider: "sample-only";
+  provider: "sample-only" | "elevenlabs";
+  elevenlabs_voice_id?: string;
   duration_estimate_seconds: number | null;
 }
 

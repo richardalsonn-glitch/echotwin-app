@@ -21,7 +21,7 @@ export type AnalysisPipelineStatus =
 export type AnalysisPipelineResult = {
   analysis: PersonaAnalysis;
   status: Extract<AnalysisPipelineStatus, "completed" | "completed_basic">;
-  provider: "openrouter" | "basic-fallback";
+  provider: "gemini" | "basic-fallback";
   model: string;
   attempts: AiAttempt[];
   summaryCache: AnalysisSummaryCache;
